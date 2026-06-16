@@ -1,0 +1,2 @@
+com.poirender.sdk
+layout item_paragraph
