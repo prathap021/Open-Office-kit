@@ -101,22 +101,24 @@ class DocumentViewerActivity : ComponentActivity() {
                         return
                     }
 
-                    when {
-                        initialDocName.endsWith(".docx", true) -> {
-                            sdk.parseDocx(uri).onSuccess { docxPages = it; isLoading = false }
-                                .onFailure { errorMessage = it.message; isLoading = false }
-                        }
-                        initialDocName.endsWith(".pptx", true) || initialDocName.endsWith(".ppt", true) -> {
-                            sdk.parsePptx(uri).onSuccess { pptxSlides = it; isLoading = false }
-                                .onFailure { errorMessage = it.message; isLoading = false }
-                        }
-                        initialDocName.endsWith(".xlsx", true) || initialDocName.endsWith(".xls", true) -> {
-                            sdk.parseExcel(uri).onSuccess { excelWorkbook = it; isLoading = false }
-                                .onFailure { errorMessage = it.message; isLoading = false }
-                        }
-                        else -> {
-                            errorMessage = "Unsupported file type: Please provide a valid DOCX, XLSX, or PPTX file."
-                            isLoading = false
+                    coroutineScope.launch {
+                        when {
+                            initialDocName.endsWith(".docx", true) -> {
+                                sdk.parseDocx(uri).onSuccess { docxPages = it; isLoading = false }
+                                    .onFailure { errorMessage = it.message; isLoading = false }
+                            }
+                            initialDocName.endsWith(".pptx", true) || initialDocName.endsWith(".ppt", true) -> {
+                                sdk.parsePptx(uri).onSuccess { pptxSlides = it; isLoading = false }
+                                    .onFailure { errorMessage = it.message; isLoading = false }
+                            }
+                            initialDocName.endsWith(".xlsx", true) || initialDocName.endsWith(".xls", true) -> {
+                                sdk.parseExcel(uri).onSuccess { excelWorkbook = it; isLoading = false }
+                                    .onFailure { errorMessage = it.message; isLoading = false }
+                            }
+                            else -> {
+                                errorMessage = "Unsupported file type: Please provide a valid DOCX, XLSX, or PPTX file."
+                                isLoading = false
+                            }
                         }
                     }
                 }

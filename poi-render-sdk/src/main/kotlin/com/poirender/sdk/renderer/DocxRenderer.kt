@@ -44,6 +44,8 @@ fun DocxRenderer(pages: List<DocumentPage>, searchQuery: String = "") {
                 is PageElement.TableElement -> TableComponent(item, searchQuery)
                 is PageElement.ImageElement -> ImageComponent(item)
                 is PageElement.Divider -> DividerComponent()
+                is PageElement.PageBreak -> { /* Render page break space if needed */ }
+                is PageElement.FootnoteElement -> { /* Render footnote */ }
             }
         }
     }

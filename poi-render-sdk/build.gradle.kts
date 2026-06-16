@@ -39,11 +39,11 @@ android {
 
 dependencies {
     // Apache POI
-    implementation("org.apache.poi:poi:5.2.3")
-    implementation("org.apache.poi:poi-ooxml:5.2.3")
+    implementation("org.apache.poi:poi:5.2.5")
+    implementation("org.apache.poi:poi-ooxml:5.2.5")
 
     // POI dependencies
-    implementation("org.apache.poi:poi-scratchpad:5.2.3")
+    implementation("org.apache.poi:poi-scratchpad:5.2.5")
     implementation("org.apache.xmlbeans:xmlbeans:5.1.1")
     implementation("org.apache.commons:commons-compress:1.23.0")
     implementation("commons-io:commons-io:2.13.0")
