@@ -3,6 +3,7 @@ package com.poirender.sdk.renderer
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.text.SpannableStringBuilder
 import android.text.style.AbsoluteSizeSpan
 import android.text.style.StyleSpan
@@ -15,8 +16,10 @@ import android.widget.LinearLayout
 import android.widget.TableLayout
 import android.widget.TableRow
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.poirender.sdk.R
 import com.poirender.sdk.model.DocumentPage
 import com.poirender.sdk.model.PageElement
 import com.poirender.sdk.model.TextAlign
@@ -28,6 +31,7 @@ class DocxRendererView @JvmOverloads constructor(
 
     init {
         layoutManager = LinearLayoutManager(context)
+        setBackgroundColor(ContextCompat.getColor(context, R.color.word_page_bg))
     }
 
     fun render(pages: List<DocumentPage>) {
@@ -65,6 +69,7 @@ class DocxAdapter(private val items: List<PageElement>) : RecyclerView.Adapter<R
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
                 setPadding(32, 24, 32, 8)
+                setBackgroundColor(ContextCompat.getColor(context, R.color.word_paper_bg))
             }
             TYPE_TEXT -> TextView(context).apply {
                 layoutParams = ViewGroup.LayoutParams(
@@ -72,6 +77,8 @@ class DocxAdapter(private val items: List<PageElement>) : RecyclerView.Adapter<R
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
                 setPadding(32, 4, 32, 4)
+                setTextColor(ContextCompat.getColor(context, R.color.word_body_text))
+                setBackgroundColor(ContextCompat.getColor(context, R.color.word_paper_bg))
             }
             TYPE_TABLE -> TableLayout(context).apply {
                 layoutParams = ViewGroup.LayoutParams(
@@ -79,6 +86,7 @@ class DocxAdapter(private val items: List<PageElement>) : RecyclerView.Adapter<R
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
                 setPadding(32, 8, 32, 8)
+                setBackgroundColor(ContextCompat.getColor(context, R.color.word_paper_bg))
             }
             TYPE_IMAGE -> ImageView(context).apply {
                 layoutParams = ViewGroup.LayoutParams(
@@ -87,12 +95,13 @@ class DocxAdapter(private val items: List<PageElement>) : RecyclerView.Adapter<R
                 )
                 adjustViewBounds = true
                 setPadding(32, 8, 32, 8)
+                setBackgroundColor(ContextCompat.getColor(context, R.color.word_paper_bg))
             }
             else -> LinearLayout(context).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT, 2
                 ).also { if (it is ViewGroup.MarginLayoutParams) it.setMargins(32, 8, 32, 8) }
-                setBackgroundColor(0xFFCCCCCC.toInt())
+                setBackgroundColor(ContextCompat.getColor(context, R.color.word_divider))
             }
         }
         return object : RecyclerView.ViewHolder(view) {}
@@ -110,6 +119,13 @@ class DocxAdapter(private val items: List<PageElement>) : RecyclerView.Adapter<R
                         2 -> 22f
                         else -> 18f
                     }
+                    val colorRes = when (item.level) {
+                        1 -> R.color.word_heading1
+                        2 -> R.color.word_heading2
+                        3 -> R.color.word_heading3
+                        else -> R.color.word_heading4
+                    }
+                    setTextColor(ContextCompat.getColor(context, colorRes))
                     setTypeface(null, Typeface.BOLD)
                 }
             }
@@ -134,13 +150,24 @@ class DocxAdapter(private val items: List<PageElement>) : RecyclerView.Adapter<R
             is PageElement.TableElement -> {
                 (view as TableLayout).apply {
                     removeAllViews()
-                    for (row in item.rows) {
+                    for ((rowIndex, row) in item.rows.withIndex()) {
                         val tableRow = TableRow(context)
+                        val isHeader = rowIndex == 0
+                        val bgColorRes = if (isHeader) R.color.word_table_header_bg
+                                         else if (rowIndex % 2 == 0) R.color.word_table_row_even
+                                         else R.color.word_table_row_odd
+                        val textColorRes = if (isHeader) R.color.word_table_header_text else R.color.word_body_text
+                        
                         for (cell in row) {
                             val cellView = TextView(context).apply {
                                 text = cell
-                                setPadding(12, 8, 12, 8)
-                                setBackgroundResource(android.R.drawable.editbox_background)
+                                setPadding(16, 12, 16, 12)
+                                setTextColor(ContextCompat.getColor(context, textColorRes))
+                                
+                                val bg = GradientDrawable()
+                                bg.setColor(ContextCompat.getColor(context, bgColorRes))
+                                bg.setStroke(1, ContextCompat.getColor(context, R.color.word_table_border))
+                                background = bg
                             }
                             tableRow.addView(cellView)
                         }

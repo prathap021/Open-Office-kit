@@ -2,8 +2,11 @@ package com.example.openofficekit
 
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.view.MotionEvent
+import android.view.ScaleGestureDetector
 import android.view.View
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -20,6 +23,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var docxView: DocxRendererView
     private lateinit var pptxView: PptxRendererView
     private lateinit var excelView: ExcelRendererView
+    private lateinit var renderContainer: FrameLayout
+
+    private var currentScale = 1.0f
+    private lateinit var scaleDetector: ScaleGestureDetector
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -29,10 +36,46 @@ class MainActivity : AppCompatActivity() {
         docxView = findViewById(R.id.docxView)
         pptxView = findViewById(R.id.pptxView)
         excelView = findViewById(R.id.excelView)
+        renderContainer = findViewById(R.id.renderContainer)
 
         findViewById<Button>(R.id.btnPick).setOnClickListener {
             filePicker.launch("*/*")
+            resetZoom()
         }
+
+        findViewById<Button>(R.id.btnZoomIn).setOnClickListener {
+            updateZoom(currentScale * 1.25f)
+        }
+
+        findViewById<Button>(R.id.btnZoomOut).setOnClickListener {
+            updateZoom(currentScale * 0.8f)
+        }
+
+        scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
+            override fun onScale(detector: ScaleGestureDetector): Boolean {
+                updateZoom(currentScale * detector.scaleFactor)
+                return true
+            }
+        })
+    }
+
+    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
+        scaleDetector.onTouchEvent(ev)
+        return super.dispatchTouchEvent(ev)
+    }
+
+    private fun updateZoom(newScale: Float) {
+        currentScale = newScale.coerceIn(0.5f, 5.0f)
+        renderContainer.pivotX = renderContainer.width / 2f
+        renderContainer.pivotY = renderContainer.height / 2f
+        renderContainer.scaleX = currentScale
+        renderContainer.scaleY = currentScale
+    }
+
+    private fun resetZoom() {
+        currentScale = 1.0f
+        renderContainer.scaleX = 1.0f
+        renderContainer.scaleY = 1.0f
     }
 
     private val filePicker = registerForActivityResult(
@@ -69,7 +112,7 @@ class MainActivity : AppCompatActivity() {
                         it.printStackTrace()
                     }
                 }
-                name.endsWith(".pptx", true) -> {
+                name.endsWith(".pptx", true) || name.endsWith(".ppt", true) -> {
                     sdk.parsePptx(uri).onSuccess { slides ->
                         docxView.visibility = View.GONE
                         pptxView.visibility = View.VISIBLE

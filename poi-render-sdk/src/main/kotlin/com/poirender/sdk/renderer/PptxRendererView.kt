@@ -18,6 +18,7 @@ class PptxRendererView @JvmOverloads constructor(
     }
 
     init {
+        setBackgroundColor(androidx.core.content.ContextCompat.getColor(context, com.poirender.sdk.R.color.ppt_viewer_bg))
         addView(viewPager)
     }
 

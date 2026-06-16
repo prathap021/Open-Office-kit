@@ -4,6 +4,8 @@ import android.content.Context
 import android.graphics.*
 import android.util.AttributeSet
 import android.view.View
+import androidx.core.content.ContextCompat
+import com.poirender.sdk.R
 import com.poirender.sdk.model.*
 
 class SlideCanvasView @JvmOverloads constructor(
@@ -29,14 +31,33 @@ class SlideCanvasView @JvmOverloads constructor(
         val h = height.toFloat()
 
         // Background
-        bgPaint.color = slide.backgroundColor
+        if (slide.backgroundColor != 0) {
+            bgPaint.color = slide.backgroundColor
+        } else {
+            bgPaint.color = ContextCompat.getColor(context, R.color.ppt_slide_bg)
+        }
         canvas.drawRect(0f, 0f, w, h, bgPaint)
 
         for (shape in slide.shapes) {
             when (shape) {
                 is SlideShape.RectShape -> {
-                    shapePaint.color = shape.fillColor
+                    if (shape.fillColor != 0) {
+                        shapePaint.color = shape.fillColor
+                    } else {
+                        shapePaint.color = ContextCompat.getColor(context, R.color.ppt_shape_fill)
+                    }
                     shapePaint.style = Paint.Style.FILL
+                    canvas.drawRect(
+                        shape.x * w, shape.y * h,
+                        (shape.x + shape.width) * w,
+                        (shape.y + shape.height) * h,
+                        shapePaint
+                    )
+                    
+                    // Draw Stroke
+                    shapePaint.color = ContextCompat.getColor(context, R.color.ppt_shape_stroke)
+                    shapePaint.style = Paint.Style.STROKE
+                    shapePaint.strokeWidth = 2f
                     canvas.drawRect(
                         shape.x * w, shape.y * h,
                         (shape.x + shape.width) * w,
@@ -45,7 +66,11 @@ class SlideCanvasView @JvmOverloads constructor(
                     )
                 }
                 is SlideShape.TextShape -> {
-                    textPaint.color = shape.color
+                    if (shape.color != 0) {
+                        textPaint.color = shape.color
+                    } else {
+                        textPaint.color = ContextCompat.getColor(context, R.color.ppt_body_text)
+                    }
                     textPaint.textSize = shape.fontSize * (w / 400f)
                     textPaint.typeface = if (shape.isBold)
                         Typeface.DEFAULT_BOLD else Typeface.DEFAULT

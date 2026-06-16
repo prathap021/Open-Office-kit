@@ -1,13 +1,13 @@
 package com.poirender.sdk.parser
 
 import com.poirender.sdk.model.*
-import org.apache.poi.xslf.usermodel.*
+import org.apache.poi.sl.usermodel.*
 import java.io.InputStream
 
 class PptxParser {
 
     fun parse(inputStream: InputStream): List<SlideData> {
-        val ppt = XMLSlideShow(inputStream)
+        val ppt = SlideShowFactory.create(inputStream)
         val slides = mutableListOf<SlideData>()
 
         val pageSize = ppt.pageSize
@@ -25,24 +25,32 @@ class PptxParser {
                 val h = a.height.toFloat() / slideH
 
                 when (shape) {
-                    is XSLFTextShape -> {
-                        val text = shape.textParagraphs
-                            .joinToString("\n") { it.text ?: "" }
+                    is TextShape<*, *> -> {
+                        val text = shape.text ?: ""
                         if (text.isNotBlank()) {
                             val run = shape.textParagraphs
                                 .firstOrNull()?.textRuns?.firstOrNull()
+                            var fontSize = 14f
+                            if (run != null && run.fontSize != null) {
+                                fontSize = run.fontSize.toFloat()
+                            }
+                            var isBold = false
+                            if (run != null) {
+                                isBold = run.isBold
+                            }
+
                             shapes.add(
                                 SlideShape.TextShape(
                                     text = text,
                                     x = x, y = y,
                                     width = w, height = h,
-                                    fontSize = run?.fontSize?.toFloat() ?: 14f,
-                                    isBold = run?.isBold ?: false
+                                    fontSize = fontSize,
+                                    isBold = isBold
                                 )
                             )
                         }
                     }
-                    is XSLFPictureShape -> {
+                    is PictureShape<*, *> -> {
                         shapes.add(
                             SlideShape.ImageShape(
                                 imageData = shape.pictureData.data,
@@ -50,7 +58,7 @@ class PptxParser {
                             )
                         )
                     }
-                    is XSLFSimpleShape -> {
+                    is SimpleShape<*, *> -> {
                         shapes.add(
                             SlideShape.RectShape(
                                 x = x, y = y, width = w, height = h
