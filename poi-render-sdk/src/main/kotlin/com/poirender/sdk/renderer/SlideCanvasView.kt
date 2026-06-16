@@ -14,13 +14,19 @@ class SlideCanvasView @JvmOverloads constructor(
 ) : View(context, attrs) {
 
     private var slideData: SlideData? = null
+    private var searchQuery: String = ""
 
     private val bgPaint = Paint()
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG)
     private val shapePaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val highlightPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.YELLOW
+        style = Paint.Style.FILL
+    }
 
-    fun setSlide(slide: SlideData) {
+    fun setSlide(slide: SlideData, query: String = "") {
         this.slideData = slide
+        this.searchQuery = query
         invalidate()
     }
 
@@ -79,6 +85,22 @@ class SlideCanvasView @JvmOverloads constructor(
                     val lines = shape.text.split("\n")
                     var lineY = shape.y * h + textPaint.textSize
                     for (line in lines) {
+                        if (searchQuery.isNotBlank() && line.contains(searchQuery, ignoreCase = true)) {
+                            var startIndex = line.indexOf(searchQuery, ignoreCase = true)
+                            while (startIndex >= 0) {
+                                val textBefore = line.substring(0, startIndex)
+                                val xOffset = textPaint.measureText(textBefore)
+                                val queryWidth = textPaint.measureText(line.substring(startIndex, startIndex + searchQuery.length))
+                                canvas.drawRect(
+                                    shape.x * w + xOffset,
+                                    lineY - textPaint.textSize,
+                                    shape.x * w + xOffset + queryWidth,
+                                    lineY + textPaint.descent(),
+                                    highlightPaint
+                                )
+                                startIndex = line.indexOf(searchQuery, startIndex + searchQuery.length, ignoreCase = true)
+                            }
+                        }
                         canvas.drawText(line, shape.x * w, lineY, textPaint)
                         lineY += textPaint.textSize * 1.4f
                     }

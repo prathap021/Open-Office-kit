@@ -34,13 +34,21 @@ class DocxRendererView @JvmOverloads constructor(
         setBackgroundColor(ContextCompat.getColor(context, R.color.word_page_bg))
     }
 
+    private var currentElements: List<PageElement> = emptyList()
+    private var searchQuery: String = ""
+
     fun render(pages: List<DocumentPage>) {
-        val elements = pages.flatMap { it.elements }
-        adapter = DocxAdapter(elements)
+        currentElements = pages.flatMap { it.elements }
+        adapter = DocxAdapter(currentElements, searchQuery)
+    }
+
+    fun highlightSearchTerm(query: String) {
+        searchQuery = query
+        adapter = DocxAdapter(currentElements, searchQuery)
     }
 }
 
-class DocxAdapter(private val items: List<PageElement>) : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+class DocxAdapter(private val items: List<PageElement>, private val searchQuery: String = "") : RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     companion object {
         const val TYPE_HEADING = 0
@@ -80,11 +88,12 @@ class DocxAdapter(private val items: List<PageElement>) : RecyclerView.Adapter<R
                 setTextColor(ContextCompat.getColor(context, R.color.word_body_text))
                 setBackgroundColor(ContextCompat.getColor(context, R.color.word_paper_bg))
             }
-            TYPE_TABLE -> TableLayout(context).apply {
+            TYPE_TABLE -> android.widget.HorizontalScrollView(context).apply {
                 layoutParams = ViewGroup.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT
                 )
+                isFillViewport = true
                 setPadding(32, 8, 32, 8)
                 setBackgroundColor(ContextCompat.getColor(context, R.color.word_paper_bg))
             }
@@ -113,7 +122,15 @@ class DocxAdapter(private val items: List<PageElement>) : RecyclerView.Adapter<R
         when (item) {
             is PageElement.HeadingElement -> {
                 (view as TextView).apply {
-                    text = item.text
+                    val spannable = SpannableStringBuilder(item.text)
+                    if (searchQuery.isNotBlank() && item.text.contains(searchQuery, ignoreCase = true)) {
+                        var index = item.text.indexOf(searchQuery, ignoreCase = true)
+                        while (index >= 0) {
+                            spannable.setSpan(android.text.style.BackgroundColorSpan(android.graphics.Color.YELLOW), index, index + searchQuery.length, 0)
+                            index = item.text.indexOf(searchQuery, index + searchQuery.length, ignoreCase = true)
+                        }
+                    }
+                    text = spannable
                     textSize = when (item.level) {
                         1 -> 28f
                         2 -> 22f
@@ -138,7 +155,20 @@ class DocxAdapter(private val items: List<PageElement>) : RecyclerView.Adapter<R
                     if (item.isUnderline) spannable.setSpan(UnderlineSpan(), 0, len, 0)
                     if (item.fontSize > 0) spannable.setSpan(AbsoluteSizeSpan(item.fontSize, true), 0, len, 0)
 
+                    if (searchQuery.isNotBlank() && item.text.contains(searchQuery, ignoreCase = true)) {
+                        var index = item.text.indexOf(searchQuery, ignoreCase = true)
+                        while (index >= 0) {
+                            spannable.setSpan(android.text.style.BackgroundColorSpan(android.graphics.Color.YELLOW), index, index + searchQuery.length, 0)
+                            index = item.text.indexOf(searchQuery, index + searchQuery.length, ignoreCase = true)
+                        }
+                    }
+
                     text = spannable
+                    if (item.color != null) {
+                        setTextColor(item.color)
+                    } else {
+                        setTextColor(ContextCompat.getColor(context, R.color.word_body_text))
+                    }
                     gravity = when (item.alignment) {
                         TextAlign.CENTER -> Gravity.CENTER
                         TextAlign.RIGHT -> Gravity.END
@@ -148,10 +178,14 @@ class DocxAdapter(private val items: List<PageElement>) : RecyclerView.Adapter<R
                 }
             }
             is PageElement.TableElement -> {
-                (view as TableLayout).apply {
+                val tableLayout = TableLayout(view.context).apply {
+                    layoutParams = ViewGroup.LayoutParams(
+                        ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ViewGroup.LayoutParams.WRAP_CONTENT
+                    )
                     removeAllViews()
                     for ((rowIndex, row) in item.rows.withIndex()) {
-                        val tableRow = TableRow(context)
+                        val tableRow = TableRow(view.context)
                         val isHeader = rowIndex == 0
                         val bgColorRes = if (isHeader) R.color.word_table_header_bg
                                          else if (rowIndex % 2 == 0) R.color.word_table_row_even
@@ -159,20 +193,33 @@ class DocxAdapter(private val items: List<PageElement>) : RecyclerView.Adapter<R
                         val textColorRes = if (isHeader) R.color.word_table_header_text else R.color.word_body_text
                         
                         for (cell in row) {
-                            val cellView = TextView(context).apply {
-                                text = cell
+                            val cellView = TextView(view.context).apply {
+                                val spannable = SpannableStringBuilder(cell)
+                                if (searchQuery.isNotBlank() && cell.contains(searchQuery, ignoreCase = true)) {
+                                    var index = cell.indexOf(searchQuery, ignoreCase = true)
+                                    while (index >= 0) {
+                                        spannable.setSpan(android.text.style.BackgroundColorSpan(android.graphics.Color.YELLOW), index, index + searchQuery.length, 0)
+                                        index = cell.indexOf(searchQuery, index + searchQuery.length, ignoreCase = true)
+                                    }
+                                }
+                                text = spannable
                                 setPadding(16, 12, 16, 12)
-                                setTextColor(ContextCompat.getColor(context, textColorRes))
+                                setTextColor(ContextCompat.getColor(view.context, textColorRes))
                                 
                                 val bg = GradientDrawable()
-                                bg.setColor(ContextCompat.getColor(context, bgColorRes))
-                                bg.setStroke(1, ContextCompat.getColor(context, R.color.word_table_border))
+                                bg.setColor(ContextCompat.getColor(view.context, bgColorRes))
+                                bg.setStroke(1, ContextCompat.getColor(view.context, R.color.word_table_border))
                                 background = bg
                             }
                             tableRow.addView(cellView)
                         }
                         addView(tableRow)
                     }
+                }
+                
+                (view as android.widget.HorizontalScrollView).apply {
+                    removeAllViews()
+                    addView(tableLayout)
                 }
             }
             is PageElement.ImageElement -> {

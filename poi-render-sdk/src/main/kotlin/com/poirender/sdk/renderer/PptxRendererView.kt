@@ -22,12 +22,24 @@ class PptxRendererView @JvmOverloads constructor(
         addView(viewPager)
     }
 
+    private var searchQuery = ""
+
     fun render(slides: List<SlideData>) {
-        viewPager.adapter = PptxAdapter(slides)
+        viewPager.adapter = PptxAdapter(slides, searchQuery)
+    }
+
+    fun highlightSearchTerm(query: String) {
+        searchQuery = query
+        (viewPager.adapter as? PptxAdapter)?.updateSearchQuery(query)
     }
 }
 
-class PptxAdapter(private val slides: List<SlideData>) : RecyclerView.Adapter<PptxAdapter.SlideViewHolder>() {
+class PptxAdapter(private val slides: List<SlideData>, private var searchQuery: String = "") : RecyclerView.Adapter<PptxAdapter.SlideViewHolder>() {
+
+    fun updateSearchQuery(query: String) {
+        searchQuery = query
+        notifyDataSetChanged()
+    }
 
     class SlideViewHolder(val slideCanvasView: SlideCanvasView) : RecyclerView.ViewHolder(slideCanvasView)
 
@@ -42,7 +54,7 @@ class PptxAdapter(private val slides: List<SlideData>) : RecyclerView.Adapter<Pp
     }
 
     override fun onBindViewHolder(holder: SlideViewHolder, position: Int) {
-        holder.slideCanvasView.setSlide(slides[position])
+        holder.slideCanvasView.setSlide(slides[position], searchQuery)
     }
 
     override fun getItemCount(): Int = slides.size

@@ -26,11 +26,25 @@ class ExcelRendererView @JvmOverloads constructor(
         setBackgroundColor(ContextCompat.getColor(context, R.color.excel_sheet_bg))
     }
 
+    private var currentWorkbook: WorkbookData? = null
+    private var searchQuery: String = ""
+
     init {
         addView(container)
     }
 
     fun render(workbook: WorkbookData) {
+        currentWorkbook = workbook
+        applyRender()
+    }
+
+    fun highlightSearchTerm(query: String) {
+        searchQuery = query
+        applyRender()
+    }
+
+    private fun applyRender() {
+        val workbook = currentWorkbook ?: return
         container.removeAllViews()
 
         for (sheet in workbook.sheets) {
@@ -72,7 +86,15 @@ class ExcelRendererView @JvmOverloads constructor(
 
                 for (cell in row.cells) {
                     val cellView = TextView(context).apply {
-                        text = cell
+                        val spannable = android.text.SpannableStringBuilder(cell)
+                        if (searchQuery.isNotBlank() && cell.contains(searchQuery, ignoreCase = true)) {
+                            var index = cell.indexOf(searchQuery, ignoreCase = true)
+                            while (index >= 0) {
+                                spannable.setSpan(android.text.style.BackgroundColorSpan(android.graphics.Color.YELLOW), index, index + searchQuery.length, 0)
+                                index = cell.indexOf(searchQuery, index + searchQuery.length, ignoreCase = true)
+                            }
+                        }
+                        text = spannable
                         setPadding(16, 12, 16, 12)
                         setTextColor(ContextCompat.getColor(context, textColorRes))
                         gravity = Gravity.CENTER_VERTICAL
