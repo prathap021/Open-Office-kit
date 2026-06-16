@@ -26,19 +26,20 @@ class PptxParser {
 
                 when (shape) {
                     is TextShape<*, *> -> {
-                        val text = shape.text ?: ""
+                        val sb = java.lang.StringBuilder()
+                        var fontSize = 14f
+                        var isBold = false
+                        for (p in shape.textParagraphs) {
+                            if (p.isBullet) sb.append("• ")
+                            for (run in p.textRuns) {
+                                sb.append(run.rawText)
+                                if (run.fontSize != null && fontSize == 14f) fontSize = run.fontSize.toFloat()
+                                if (run.isBold) isBold = true
+                            }
+                            sb.append("\n")
+                        }
+                        val text = sb.toString().trimEnd()
                         if (text.isNotBlank()) {
-                            val run = shape.textParagraphs
-                                .firstOrNull()?.textRuns?.firstOrNull()
-                            var fontSize = 14f
-                            if (run != null && run.fontSize != null) {
-                                fontSize = run.fontSize.toFloat()
-                            }
-                            var isBold = false
-                            if (run != null) {
-                                isBold = run.isBold
-                            }
-
                             shapes.add(
                                 SlideShape.TextShape(
                                     text = text,

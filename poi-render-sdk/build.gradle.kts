@@ -1,6 +1,7 @@
 plugins {
     id("com.android.library")
     id("maven-publish")
+    alias(libs.plugins.compose.compiler)
 }
 
 android {
@@ -9,6 +10,10 @@ android {
 
     defaultConfig {
         minSdk = 21
+    }
+
+    buildFeatures {
+        compose = true
     }
 
     compileOptions {
@@ -54,6 +59,13 @@ dependencies {
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
     implementation("androidx.viewpager2:viewpager2:1.0.0")
+
+    // Compose
+    implementation(platform(libs.compose.bom))
+    implementation(libs.androidx.compose.ui)
+    implementation(libs.androidx.compose.ui.graphics)
+    implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.material3)
 }
 
 

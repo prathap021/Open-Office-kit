@@ -3,168 +3,247 @@ package com.example.openofficekit
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
-import android.view.MotionEvent
-import android.view.ScaleGestureDetector
-import android.view.View
-import android.widget.Button
-import android.widget.EditText
-import android.widget.FrameLayout
-import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.poirender.sdk.PoiRenderSDK
-import com.poirender.sdk.renderer.DocxRendererView
-import com.poirender.sdk.renderer.ExcelRendererView
-import com.poirender.sdk.renderer.PptxRendererView
+import com.poirender.sdk.model.*
+import com.poirender.sdk.renderer.DocxRenderer
+import com.poirender.sdk.renderer.ExcelRenderer
+import com.poirender.sdk.renderer.PptxRenderer
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
-class DocumentViewerActivity : AppCompatActivity() {
+class DocumentViewerActivity : ComponentActivity() {
 
     private lateinit var sdk: PoiRenderSDK
-    private lateinit var docxView: DocxRendererView
-    private lateinit var pptxView: PptxRendererView
-    private lateinit var excelView: ExcelRendererView
-    private lateinit var renderContainer: FrameLayout
-    private lateinit var tvDocumentName: TextView
 
-    private var currentScale = 1.0f
-    private var panX = 0f
-    private var panY = 0f
-    private lateinit var scaleDetector: ScaleGestureDetector
-    private lateinit var gestureDetector: android.view.GestureDetector
-
+    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_document_viewer)
-
         sdk = PoiRenderSDK.init(this)
-        docxView = findViewById(R.id.docxView)
-        pptxView = findViewById(R.id.pptxView)
-        excelView = findViewById(R.id.excelView)
-        renderContainer = findViewById(R.id.renderContainer)
-        tvDocumentName = findViewById(R.id.tvDocumentName)
-
-        val etSearch = findViewById<EditText>(R.id.etSearch)
-        findViewById<Button>(R.id.btnSearch).setOnClickListener {
-            val query = etSearch.text.toString()
-            if (docxView.visibility == View.VISIBLE) docxView.highlightSearchTerm(query)
-            if (pptxView.visibility == View.VISIBLE) pptxView.highlightSearchTerm(query)
-            if (excelView.visibility == View.VISIBLE) excelView.highlightSearchTerm(query)
-        }
-
-        scaleDetector = ScaleGestureDetector(this, object : ScaleGestureDetector.SimpleOnScaleGestureListener() {
-            override fun onScale(detector: ScaleGestureDetector): Boolean {
-                updateZoom(currentScale * detector.scaleFactor)
-                return true
-            }
-        })
-
-        gestureDetector = android.view.GestureDetector(this, object : android.view.GestureDetector.SimpleOnGestureListener() {
-            override fun onScroll(
-                e1: MotionEvent?, e2: MotionEvent,
-                distanceX: Float, distanceY: Float
-            ): Boolean {
-                if (currentScale > 1.0f) {
-                    panX -= distanceX
-                    panY -= distanceY
-                    applyZoomAndPan()
-                    return true
-                }
-                return false
-            }
-        })
 
         val uriString = intent.getStringExtra("document_uri")
-        if (uriString != null) {
-            val uri = Uri.parse(uriString)
-            loadDocument(uri)
-        } else {
+        if (uriString == null) {
             Toast.makeText(this, "No document provided.", Toast.LENGTH_SHORT).show()
             finish()
+            return
         }
-    }
+        val uri = Uri.parse(uriString)
 
-    override fun dispatchTouchEvent(ev: MotionEvent): Boolean {
-        scaleDetector.onTouchEvent(ev)
-        if (ev.pointerCount == 1) {
-            gestureDetector.onTouchEvent(ev)
-        }
-        return super.dispatchTouchEvent(ev)
-    }
-
-    private fun updateZoom(newScale: Float) {
-        currentScale = newScale.coerceIn(1.0f, 5.0f)
-        applyZoomAndPan()
-    }
-
-    private fun applyZoomAndPan() {
-        val maxPanX = (renderContainer.width * (currentScale - 1)) / 2
-        val maxPanY = (renderContainer.height * (currentScale - 1)) / 2
-
-        panX = panX.coerceIn(-maxPanX, maxPanX)
-        panY = panY.coerceIn(-maxPanY, maxPanY)
-
-        renderContainer.pivotX = renderContainer.width / 2f
-        renderContainer.pivotY = renderContainer.height / 2f
-        renderContainer.scaleX = currentScale
-        renderContainer.scaleY = currentScale
-        renderContainer.translationX = panX
-        renderContainer.translationY = panY
-    }
-
-    private fun loadDocument(uri: Uri) {
-        var name = "unknown"
+        var initialDocName = "unknown"
         contentResolver.query(uri, null, null, null, null)?.use { cursor ->
             val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
             if (nameIndex != -1 && cursor.moveToFirst()) {
-                name = cursor.getString(nameIndex)
+                initialDocName = cursor.getString(nameIndex)
             }
         }
-
-        if (name == "unknown") {
-            name = uri.lastPathSegment ?: ""
+        if (initialDocName == "unknown") {
+            initialDocName = uri.lastPathSegment ?: "unknown"
         }
-        tvDocumentName.text = name
 
-        lifecycleScope.launch {
-            when {
-                name.endsWith(".docx", true) -> {
-                    sdk.parseDocx(uri).onSuccess { pages ->
-                        docxView.visibility = View.VISIBLE
-                        pptxView.visibility = View.GONE
-                        excelView.visibility = View.GONE
-                        docxView.render(pages)
-                    }.onFailure {
-                        Toast.makeText(this@DocumentViewerActivity, "Error: ${it.message}", Toast.LENGTH_LONG).show()
-                        it.printStackTrace()
+        setContent {
+            var isDarkMode by remember { mutableStateOf(false) }
+            var isHighContrast by remember { mutableStateOf(false) }
+            var textScale by remember { mutableStateOf(1f) }
+
+            MaterialTheme(
+                colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
+            ) {
+                var searchQuery by remember { mutableStateOf("") }
+                var searchInput by remember { mutableStateOf("") }
+                var showSearchBar by remember { mutableStateOf(false) }
+
+                var docxPages by remember { mutableStateOf<List<DocumentPage>?>(null) }
+                var excelWorkbook by remember { mutableStateOf<WorkbookData?>(null) }
+                var pptxSlides by remember { mutableStateOf<List<SlideData>?>(null) }
+                
+                var errorMessage by remember { mutableStateOf<String?>(null) }
+                var isLoading by remember { mutableStateOf(true) }
+                var progressValue by remember { mutableStateOf(0f) }
+                
+                var requiresPassword by remember { mutableStateOf(false) }
+
+                val coroutineScope = rememberCoroutineScope()
+
+                fun loadDocument() {
+                    isLoading = true
+                    errorMessage = null
+                    requiresPassword = false
+                    progressValue = 0f
+                    
+                    coroutineScope.launch {
+                        while(progressValue < 0.9f && isLoading) {
+                            delay(100)
+                            progressValue += 0.1f
+                        }
+                    }
+
+                    // Mocking a password prompt for demonstration if filename contains "secret"
+                    if (initialDocName.contains("secret", ignoreCase = true) && !requiresPassword) {
+                        requiresPassword = true
+                        isLoading = false
+                        return
+                    }
+
+                    when {
+                        initialDocName.endsWith(".docx", true) -> {
+                            sdk.parseDocx(uri).onSuccess { docxPages = it; isLoading = false }
+                                .onFailure { errorMessage = it.message; isLoading = false }
+                        }
+                        initialDocName.endsWith(".pptx", true) || initialDocName.endsWith(".ppt", true) -> {
+                            sdk.parsePptx(uri).onSuccess { pptxSlides = it; isLoading = false }
+                                .onFailure { errorMessage = it.message; isLoading = false }
+                        }
+                        initialDocName.endsWith(".xlsx", true) || initialDocName.endsWith(".xls", true) -> {
+                            sdk.parseExcel(uri).onSuccess { excelWorkbook = it; isLoading = false }
+                                .onFailure { errorMessage = it.message; isLoading = false }
+                        }
+                        else -> {
+                            errorMessage = "Unsupported file type: Please provide a valid DOCX, XLSX, or PPTX file."
+                            isLoading = false
+                        }
                     }
                 }
-                name.endsWith(".pptx", true) || name.endsWith(".ppt", true) -> {
-                    sdk.parsePptx(uri).onSuccess { slides ->
-                        docxView.visibility = View.GONE
-                        pptxView.visibility = View.VISIBLE
-                        excelView.visibility = View.GONE
-                        pptxView.render(slides)
-                    }.onFailure {
-                        Toast.makeText(this@DocumentViewerActivity, "Error: ${it.message}", Toast.LENGTH_LONG).show()
-                        it.printStackTrace()
-                    }
+
+                LaunchedEffect(uri) {
+                    loadDocument()
                 }
-                name.endsWith(".xlsx", true) || name.endsWith(".xls", true) -> {
-                    sdk.parseExcel(uri).onSuccess { workbook ->
-                        docxView.visibility = View.GONE
-                        pptxView.visibility = View.GONE
-                        excelView.visibility = View.VISIBLE
-                        excelView.render(workbook)
-                    }.onFailure {
-                        Toast.makeText(this@DocumentViewerActivity, "Error: ${it.message}", Toast.LENGTH_LONG).show()
-                        it.printStackTrace()
+
+                var scale by remember { mutableStateOf(1f) }
+                var offsetX by remember { mutableStateOf(0f) }
+                var offsetY by remember { mutableStateOf(0f) }
+                var showMenu by remember { mutableStateOf(false) }
+
+                Scaffold(
+                    topBar = {
+                        TopAppBar(
+                            title = {
+                                Column {
+                                    Text(initialDocName, fontSize = 16.sp, maxLines = 1, fontWeight = FontWeight.Bold)
+                                    val badge = initialDocName.substringAfterLast(".", "unknown").uppercase()
+                                    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.small) {
+                                        Text(badge, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
+                                    }
+                                }
+                            },
+                            actions = {
+                                IconButton(onClick = { showSearchBar = !showSearchBar }) {
+                                    Icon(Icons.Default.Search, contentDescription = "Search")
+                                }
+                                IconButton(onClick = { showMenu = true }) {
+                                    Icon(Icons.Default.MoreVert, contentDescription = "More")
+                                }
+                                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
+                                    DropdownMenuItem(text = { Text("Print") }, onClick = { showMenu = false; Toast.makeText(this@DocumentViewerActivity, "Print...", Toast.LENGTH_SHORT).show() })
+                                    DropdownMenuItem(text = { Text("Share Link") }, onClick = { showMenu = false; Toast.makeText(this@DocumentViewerActivity, "Sharing...", Toast.LENGTH_SHORT).show() })
+                                    DropdownMenuItem(text = { Text("Download File") }, onClick = { showMenu = false; Toast.makeText(this@DocumentViewerActivity, "Downloading...", Toast.LENGTH_SHORT).show() })
+                                    Divider()
+                                    DropdownMenuItem(text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") }, onClick = { isDarkMode = !isDarkMode; showMenu = false })
+                                    DropdownMenuItem(text = { Text(if (isHighContrast) "Normal Contrast" else "High Contrast") }, onClick = { isHighContrast = !isHighContrast; showMenu = false })
+                                    DropdownMenuItem(text = { Text("Text Size Override (+20%)") }, onClick = { textScale += 0.2f; showMenu = false })
+                                    Divider()
+                                    DropdownMenuItem(text = { Text("Zoom 50%") }, onClick = { scale = 0.5f; offsetX = 0f; offsetY = 0f; showMenu = false })
+                                    DropdownMenuItem(text = { Text("Zoom 75%") }, onClick = { scale = 0.75f; offsetX = 0f; offsetY = 0f; showMenu = false })
+                                    DropdownMenuItem(text = { Text("Zoom 100%") }, onClick = { scale = 1.0f; offsetX = 0f; offsetY = 0f; showMenu = false })
+                                    DropdownMenuItem(text = { Text("Fit to Screen / Width") }, onClick = { scale = 1.0f; offsetX = 0f; offsetY = 0f; showMenu = false })
+                                }
+                            }
+                        )
                     }
-                }
-                else -> {
-                    Toast.makeText(this@DocumentViewerActivity, "Unsupported file type: $name", Toast.LENGTH_SHORT).show()
-                    finish()
+                ) { paddingValues ->
+                    Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
+                        if (showSearchBar) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(8.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = searchInput,
+                                    onValueChange = { searchInput = it; searchQuery = it },
+                                    modifier = Modifier.weight(1f),
+                                    placeholder = { Text("Find in document...") },
+                                    singleLine = true
+                                )
+                                IconButton(onClick = { showSearchBar = false; searchQuery = ""; searchInput = "" }) {
+                                    Icon(Icons.Default.Close, contentDescription = "Close")
+                                }
+                            }
+                        }
+
+                        if (isLoading) {
+                            Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                                CircularProgressIndicator(progress = progressValue)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text("Parsing Document...", color = MaterialTheme.colorScheme.onSurface)
+                                Spacer(modifier = Modifier.height(32.dp))
+                                // Loading skeleton
+                                Box(modifier = Modifier.fillMaxWidth(0.8f).height(24.dp).background(Color.LightGray.copy(alpha=0.5f)))
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Box(modifier = Modifier.fillMaxWidth(0.6f).height(24.dp).background(Color.LightGray.copy(alpha=0.5f)))
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Box(modifier = Modifier.fillMaxWidth(0.9f).height(24.dp).background(Color.LightGray.copy(alpha=0.5f)))
+                            }
+                        } else if (requiresPassword) {
+                            Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                                Icon(Icons.Default.Lock, contentDescription = "Password", modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text("Password Protected File", style = MaterialTheme.typography.titleLarge)
+                                Spacer(modifier = Modifier.height(16.dp))
+                                OutlinedTextField(value = "", onValueChange = {}, label = { Text("Enter Password") })
+                                Button(onClick = { requiresPassword = false; isLoading = true; coroutineScope.launch { delay(500); loadDocument() } }, modifier = Modifier.padding(top = 8.dp)) { Text("Unlock") }
+                            }
+                        } else if (errorMessage != null) {
+                            Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                                Icon(Icons.Default.Warning, contentDescription = "Error", tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(64.dp))
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(errorMessage!!, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodyLarge)
+                                Spacer(modifier = Modifier.height(24.dp))
+                                Button(onClick = { loadDocument() }) {
+                                    Text("Retry Loading")
+                                }
+                            }
+                        } else {
+                            // Document Viewport
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .pointerInput(Unit) {
+                                        detectTransformGestures { _, pan, zoom, _ ->
+                                            scale = (scale * zoom).coerceIn(0.1f, 5f)
+                                            offsetX += pan.x * scale
+                                            offsetY += pan.y * scale
+                                        }
+                                    }
+                                    .graphicsLayer(
+                                        scaleX = scale,
+                                        scaleY = scale,
+                                        translationX = offsetX,
+                                        translationY = offsetY
+                                    )
+                            ) {
+                                docxPages?.let { DocxRenderer(pages = it, searchQuery = searchQuery) }
+                                excelWorkbook?.let { ExcelRenderer(workbook = it, searchQuery = searchQuery) }
+                                pptxSlides?.let { PptxRenderer(slides = it, searchQuery = searchQuery) }
+                            }
+                        }
+                    }
                 }
             }
         }

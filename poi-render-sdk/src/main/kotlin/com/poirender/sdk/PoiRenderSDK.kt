@@ -1,5 +1,6 @@
 package com.poirender.sdk
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import com.poirender.sdk.model.DocumentPage
@@ -15,6 +16,7 @@ class PoiRenderSDK private constructor(
     private val context: Context
 ) {
     companion object {
+
         @Volatile private var instance: PoiRenderSDK? = null
 
         fun init(context: Context): PoiRenderSDK {

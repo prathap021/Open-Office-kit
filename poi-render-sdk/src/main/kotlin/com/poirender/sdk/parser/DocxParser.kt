@@ -109,7 +109,9 @@ class DocxParser {
 
     private fun parseTable(table: XWPFTable): PageElement.TableElement {
         val rows = table.rows.map { row ->
-            row.tableCells.map { it.text }
+            row.tableCells.map { cell ->
+                PageElement.TableCell(listOf(PageElement.TextElement(cell.text)))
+            }
         }
         return PageElement.TableElement(rows)
     }
