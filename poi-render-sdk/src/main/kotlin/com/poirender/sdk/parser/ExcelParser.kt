@@ -6,12 +6,14 @@ import org.apache.poi.ss.usermodel.WorkbookFactory
 import java.io.InputStream
 
 class ExcelParser {
-    fun parse(inputStream: InputStream): WorkbookData {
+    fun parse(inputStream: InputStream, onProgress: ((Float) -> Unit)? = null): WorkbookData {
+        onProgress?.invoke(0.05f)
         val workbook = WorkbookFactory.create(inputStream)
         val formatter = DataFormatter()
         val sheets = mutableListOf<SheetData>()
+        val totalSheets = workbook.numberOfSheets
 
-        for (i in 0 until workbook.numberOfSheets) {
+        for (i in 0 until totalSheets) {
             val sheet = workbook.getSheetAt(i)
             val rows = mutableListOf<RowData>()
             val mergedRegions = sheet.mergedRegions
@@ -54,6 +56,7 @@ class ExcelParser {
                 rows.add(RowData(cells))
             }
             sheets.add(SheetData(sheet.sheetName, rows))
+            onProgress?.invoke((i + 1).toFloat() / totalSheets)
         }
 
         workbook.close()

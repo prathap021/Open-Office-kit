@@ -19,30 +19,30 @@ class PoiRenderSDK private constructor(
         }
     }
 
-    suspend fun parseDocx(uri: Uri): Result<List<DocumentPage>> =
+    suspend fun parseDocx(uri: Uri, onProgress: ((Float) -> Unit)? = null): Result<List<DocumentPage>> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val stream = context.contentResolver.openInputStream(uri)
                     ?: error("Cannot open file")
-                DocxParser().parse(stream)
+                DocxParser().parse(stream, onProgress)
             }
         }
 
-    suspend fun parsePptx(uri: Uri): Result<List<SlideData>> =
+    suspend fun parsePptx(uri: Uri, onProgress: ((Float) -> Unit)? = null): Result<List<SlideData>> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val stream = context.contentResolver.openInputStream(uri)
                     ?: error("Cannot open file")
-                PptxParser().parse(stream)
+                PptxParser().parse(stream, onProgress)
             }
         }
 
-    suspend fun parseExcel(uri: Uri): Result<WorkbookData> =
+    suspend fun parseExcel(uri: Uri, onProgress: ((Float) -> Unit)? = null): Result<WorkbookData> =
         withContext(Dispatchers.IO) {
             runCatching {
                 val stream = context.contentResolver.openInputStream(uri)
                     ?: error("Cannot open file")
-                ExcelParser().parse(stream)
+                ExcelParser().parse(stream, onProgress)
             }
         }
 }

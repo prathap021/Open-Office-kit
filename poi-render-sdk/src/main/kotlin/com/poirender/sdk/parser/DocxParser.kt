@@ -7,7 +7,8 @@ import java.io.InputStream
 
 class DocxParser {
 
-    fun parse(inputStream: InputStream): List<DocumentPage> {
+    fun parse(inputStream: InputStream, onProgress: ((Float) -> Unit)? = null): List<DocumentPage> {
+        onProgress?.invoke(0.05f)
         val doc = XWPFDocument(inputStream)
         val elements = mutableListOf<PageElement>()
 
@@ -22,6 +23,7 @@ class DocxParser {
                 elements.add(PageElement.Divider)
             }
         } catch (_: Exception) {}
+        onProgress?.invoke(0.1f)
 
         // 2. Headers
         for (header in doc.headerList) {
@@ -30,10 +32,13 @@ class DocxParser {
             }
             elements.add(PageElement.Divider)
         }
+        onProgress?.invoke(0.2f)
 
         // 3. Body Elements (Paragraphs, Tables, Inline Images in correct order)
-        for (bodyElement in doc.bodyElements) {
+        val totalElements = doc.bodyElements.size
+        for ((index, bodyElement) in doc.bodyElements.withIndex()) {
             parseBodyElement(bodyElement, elements)
+            onProgress?.invoke(0.2f + (0.6f * (index + 1) / totalElements))
         }
 
         // 4. Footers
@@ -43,6 +48,7 @@ class DocxParser {
                 parseBodyElement(bodyElement, elements)
             }
         }
+        onProgress?.invoke(1.0f)
 
         doc.close()
         return listOf(DocumentPage(elements))

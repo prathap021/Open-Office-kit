@@ -16,6 +16,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
@@ -87,13 +88,6 @@ class DocumentViewerActivity : ComponentActivity() {
                     requiresPassword = false
                     progressValue = 0f
                     
-                    coroutineScope.launch {
-                        while(progressValue < 0.9f && isLoading) {
-                            delay(100)
-                            progressValue += 0.1f
-                        }
-                    }
-
                     // Mocking a password prompt for demonstration if filename contains "secret"
                     if (initialDocName.contains("secret", ignoreCase = true) && !requiresPassword) {
                         requiresPassword = true
@@ -102,17 +96,18 @@ class DocumentViewerActivity : ComponentActivity() {
                     }
 
                     coroutineScope.launch {
+                        val onProgress: (Float) -> Unit = { progressValue = it }
                         when {
                             initialDocName.endsWith(".docx", true) -> {
-                                sdk.parseDocx(uri).onSuccess { docxPages = it; isLoading = false }
+                                sdk.parseDocx(uri, onProgress).onSuccess { docxPages = it; isLoading = false }
                                     .onFailure { errorMessage = it.message; isLoading = false }
                             }
                             initialDocName.endsWith(".pptx", true) || initialDocName.endsWith(".ppt", true) -> {
-                                sdk.parsePptx(uri).onSuccess { pptxSlides = it; isLoading = false }
+                                sdk.parsePptx(uri, onProgress).onSuccess { pptxSlides = it; isLoading = false }
                                     .onFailure { errorMessage = it.message; isLoading = false }
                             }
                             initialDocName.endsWith(".xlsx", true) || initialDocName.endsWith(".xls", true) -> {
-                                sdk.parseExcel(uri).onSuccess { excelWorkbook = it; isLoading = false }
+                                sdk.parseExcel(uri, onProgress).onSuccess { excelWorkbook = it; isLoading = false }
                                     .onFailure { errorMessage = it.message; isLoading = false }
                             }
                             else -> {
@@ -190,19 +185,47 @@ class DocumentViewerActivity : ComponentActivity() {
                         }
 
                         if (isLoading) {
-                            Column(modifier = Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                                CircularProgressIndicator(progress = progressValue)
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text("Parsing Document...", color = MaterialTheme.colorScheme.onSurface)
-                                Spacer(modifier = Modifier.height(32.dp))
-                                // Loading skeleton
-                                Box(modifier = Modifier.fillMaxWidth(0.8f).height(24.dp).background(Color.LightGray.copy(alpha=0.5f)))
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Box(modifier = Modifier.fillMaxWidth(0.6f).height(24.dp).background(Color.LightGray.copy(alpha=0.5f)))
-                                Spacer(modifier = Modifier.height(12.dp))
-                                Box(modifier = Modifier.fillMaxWidth(0.9f).height(24.dp).background(Color.LightGray.copy(alpha=0.5f)))
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                Column(
+                                    modifier = Modifier.align(Alignment.Center),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        "Document is loading...",
+                                        style = MaterialTheme.typography.headlineSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.height(24.dp))
+                                    // Loading skeleton
+                                    Box(modifier = Modifier.fillMaxWidth(0.8f).height(20.dp).background(Color.LightGray.copy(alpha=0.3f)))
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Box(modifier = Modifier.fillMaxWidth(0.6f).height(20.dp).background(Color.LightGray.copy(alpha=0.3f)))
+                                }
+
+                                Column(
+                                    modifier = Modifier
+                                        .align(Alignment.BottomCenter)
+                                        .fillMaxWidth()
+                                        .padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    Text(
+                                        text = "${(progressValue * 100).toInt()}%",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    LinearProgressIndicator(
+                                        progress = { progressValue },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(8.dp),
+                                        strokeCap = StrokeCap.Round
+                                    )
+                                }
                             }
-                        } else if (requiresPassword) {
+                        }
+else if (requiresPassword) {
                             Column(modifier = Modifier.fillMaxSize().padding(16.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
                                 Icon(Icons.Default.Lock, contentDescription = "Password", modifier = Modifier.size(64.dp), tint = MaterialTheme.colorScheme.primary)
                                 Spacer(modifier = Modifier.height(16.dp))

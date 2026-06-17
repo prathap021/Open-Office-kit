@@ -6,7 +6,8 @@ import java.io.InputStream
 
 class PptxParser {
 
-    fun parse(inputStream: InputStream): List<SlideData> {
+    fun parse(inputStream: InputStream, onProgress: ((Float) -> Unit)? = null): List<SlideData> {
+        onProgress?.invoke(0.05f)
         // Create the SlideShow from the InputStream (supports both binary PPT and XML PPTX)
         val ppt: SlideShow<*, *>
         try {
@@ -17,6 +18,7 @@ class PptxParser {
         }
 
         val slides = mutableListOf<SlideData>()
+        val totalSlides = ppt.slides.size
 
         val pageSize = ppt.pageSize
         val slideW = pageSize.width.toFloat()
@@ -90,6 +92,7 @@ class PptxParser {
                 println("Warning: Failed to iterate shapes on slide $index due to record reading issue. Message: ${e.message}")
             }
             slides.add(SlideData(index = index, shapes = shapes))
+            onProgress?.invoke((index + 1).toFloat() / totalSlides)
         }
 
         ppt.close()
