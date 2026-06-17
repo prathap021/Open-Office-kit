@@ -6,13 +6,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.*
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.colorResource
@@ -20,14 +19,21 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.rememberTextMeasurer
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.poirender.sdk.R
 import com.poirender.sdk.model.SlideData
 import com.poirender.sdk.model.SlideShape
+import kotlin.math.max
+import kotlin.math.min
 
 @Composable
-fun PptxRenderer(slides: List<SlideData>, searchQuery: String = "") {
+fun PptxRenderer(
+    slides: List<SlideData>,
+    searchQuery: String = ""
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -63,13 +69,11 @@ fun PptxRenderer(slides: List<SlideData>, searchQuery: String = "") {
 }
 
 @Composable
-fun SlideCanvas(slide: SlideData, searchQuery: String) {
+fun SlideCanvas(
+    slide: SlideData,
+    searchQuery: String
+) {
     val textMeasurer = rememberTextMeasurer()
-    val defaultShapeFillColor = colorResource(id = R.color.ppt_shape_fill)
-    val defaultShapeStrokeColor = colorResource(id = R.color.ppt_shape_stroke)
-    val defaultTextColor = colorResource(id = R.color.ppt_body_text)
-
-    // Pre-decode bitmaps to avoid doing it on every draw frame
     val bitmaps = remember(slide.index) {
         slide.shapes.filterIsInstance<SlideShape.ImageShape>().associateWith { shape ->
             BitmapFactory.decodeByteArray(shape.imageData, 0, shape.imageData.size)?.asImageBitmap()
@@ -77,179 +81,174 @@ fun SlideCanvas(slide: SlideData, searchQuery: String) {
     }
 
     Canvas(modifier = Modifier.fillMaxSize()) {
-        val w = size.width
-        val h = size.height
+        val slideW = slide.slideWidth.takeIf { it > 0f } ?: 1f
+        val slideH = slide.slideHeight.takeIf { it > 0f } ?: 1f
 
-        val bgColor = Color(slide.backgroundColor)
-        drawRect(color = bgColor, size = Size(w, h))
+        val scale = minOf(size.width / slideW, size.height / slideH)
+        val contentW = slideW * scale
+        val contentH = slideH * scale
+        val offsetX = (size.width - contentW) / 2f
+        val offsetY = (size.height - contentH) / 2f
+
+        fun sx(value: Float) = offsetX + value * scale
+        fun sy(value: Float) = offsetY + value * scale
+        fun sw(value: Float) = value * scale
+        fun sh(value: Float) = value * scale
+
+        drawRect(color = Color(slide.backgroundColor), size = size)
 
         for (shape in slide.shapes) {
             when (shape) {
                 is SlideShape.RectShape -> {
-                    val fillColor = Color(shape.fillColor)
                     drawRect(
-                        color = fillColor,
-                        topLeft = Offset(shape.x * w, shape.y * h),
-                        size = Size(shape.width * w, shape.height * h)
+                        color = Color(shape.fillColor),
+                        topLeft = Offset(sx(shape.x * slideW), sy(shape.y * slideH)),
+                        size = Size(sw(shape.width * slideW), sh(shape.height * slideH))
                     )
                     drawRect(
                         color = Color(shape.strokeColor),
-                        topLeft = Offset(shape.x * w, shape.y * h),
-                        size = Size(shape.width * w, shape.height * h),
-                        style = Stroke(width = 2f)
+                        topLeft = Offset(sx(shape.x * slideW), sy(shape.y * slideH)),
+                        size = Size(sw(shape.width * slideW), sh(shape.height * slideH)),
+                        style = Stroke(width = max(1f, 2f * scale))
                     )
                 }
+
                 is SlideShape.TextShape -> {
-                    val textColor = Color(shape.color)
-                    val fontSize = shape.fontSize * (w / 400f)
-                    val fontWeight = if (shape.isBold) FontWeight.Bold else FontWeight.Normal
+                    val baseFont = shape.fontSize.coerceIn(10f, 24f)
+                    val fontSizePx = (baseFont * scale).coerceIn(10f, 30f)
+                    val style = TextStyle(
+                        color = Color(shape.color),
+                        fontSize = fontSizePx.sp,
+                        fontWeight = if (shape.isBold) FontWeight.Bold else FontWeight.Normal
+                    )
 
                     val lines = shape.text.split("\n")
-                    var lineY = shape.y * h + fontSize
+                    var y = sy(shape.y * slideH) + fontSizePx
+
                     for (line in lines) {
                         if (searchQuery.isNotBlank() && line.contains(searchQuery, ignoreCase = true)) {
-                            var startIndex = line.indexOf(searchQuery, ignoreCase = true)
-                            while (startIndex >= 0) {
-                                val textBefore = line.substring(0, startIndex)
-                                val xOffset = textMeasurer.measure(textBefore, TextStyle(fontSize = fontSize.sp, fontWeight = fontWeight)).size.width
-                                val queryWidth = textMeasurer.measure(line.substring(startIndex, startIndex + searchQuery.length), TextStyle(fontSize = fontSize.sp, fontWeight = fontWeight)).size.width
+                            val idx = line.indexOf(searchQuery, ignoreCase = true)
+                            if (idx >= 0) {
+                                val before = line.substring(0, idx)
+                                val query = line.substring(idx, idx + searchQuery.length)
+                                val beforeW = textMeasurer.measure(before, style).size.width.toFloat()
+                                val queryW = textMeasurer.measure(query, style).size.width.toFloat()
                                 drawRect(
-                                    color = Color.Yellow,
-                                    topLeft = Offset(shape.x * w + xOffset, lineY - fontSize),
-                                    size = Size(queryWidth.toFloat(), fontSize * 1.4f)
+                                    color = Color.Yellow.copy(alpha = 0.35f),
+                                    topLeft = Offset(sx(shape.x * slideW) + beforeW, y - fontSizePx),
+                                    size = Size(queryW, fontSizePx * 1.25f)
                                 )
-                                startIndex = line.indexOf(searchQuery, startIndex + searchQuery.length, ignoreCase = true)
                             }
                         }
+
                         drawText(
                             textMeasurer = textMeasurer,
                             text = line,
-                            topLeft = Offset(shape.x * w, lineY - fontSize),
-                            style = TextStyle(color = textColor, fontSize = fontSize.sp, fontWeight = fontWeight)
+                            topLeft = Offset(sx(shape.x * slideW), y - fontSizePx),
+                            style = style
                         )
-                        lineY += fontSize * 1.4f
+                        y += fontSizePx * 1.35f
                     }
                 }
+
                 is SlideShape.ImageShape -> {
-                    val bitmap = bitmaps[shape]
-                    if (bitmap != null) {
-                        drawImage(
-                            image = bitmap,
-                            dstOffset = androidx.compose.ui.unit.IntOffset((shape.x * w).toInt(), (shape.y * h).toInt()),
-                            dstSize = androidx.compose.ui.unit.IntSize((shape.width * w).toInt(), (shape.height * h).toInt())
-                        )
-                    }
+                    val bitmap = bitmaps[shape] ?: continue
+                    val dstW = max(1, sw(shape.width * slideW).toInt())
+                    val dstH = max(1, sh(shape.height * slideH).toInt())
+                    drawImage(
+                        image = bitmap,
+                        dstOffset = IntOffset(sx(shape.x * slideW).toInt(), sy(shape.y * slideH).toInt()),
+                        dstSize = IntSize(dstW, dstH)
+                    )
                 }
+
                 is SlideShape.ConnectorShape -> {
                     drawLine(
                         color = Color(shape.strokeColor),
-                        start = Offset(shape.startX * w, shape.startY * h),
-                        end = Offset(shape.endX * w, shape.endY * h),
-                        strokeWidth = 2f
+                        start = Offset(sx(shape.startX * slideW), sy(shape.startY * slideH)),
+                        end = Offset(sx(shape.endX * slideW), sy(shape.endY * slideH)),
+                        strokeWidth = max(1f, 2f * scale)
                     )
                 }
-                is SlideShape.TableShape -> {
-                    val tableX = shape.x * w
-                    val tableY = shape.y * h
-                    val tableW = shape.width * w
-                    val tableH = shape.height * h
-                    
-                    // Outer border and background
-                    drawRect(
-                        color = Color.LightGray.copy(alpha = 0.3f),
-                        topLeft = Offset(tableX, tableY),
-                        size = Size(tableW, tableH)
-                    )
-                    drawRect(
-                        color = Color.Gray,
-                        topLeft = Offset(tableX, tableY),
-                        size = Size(tableW, tableH),
-                        style = Stroke(width = 2f)
-                    )
 
-                    // Inner grid lines
+                is SlideShape.TableShape -> {
+                    val x = sx(shape.x * slideW)
+                    val y = sy(shape.y * slideH)
+                    val w = sw(shape.width * slideW)
+                    val h = sh(shape.height * slideH)
                     val rows = shape.rows.coerceAtLeast(1)
                     val cols = shape.cols.coerceAtLeast(1)
-                    val cellW = tableW / cols
-                    val cellH = tableH / rows
+                    val cellW = w / cols
+                    val cellH = h / rows
 
-                    for (c in 1 until cols) {
-                        val lineX = tableX + c * cellW
-                        drawLine(
-                            color = Color.Gray,
-                            start = Offset(lineX, tableY),
-                            end = Offset(lineX, tableY + tableH),
-                            strokeWidth = 1f
-                        )
-                    }
-                    for (r in 1 until rows) {
-                        val lineY = tableY + r * cellH
-                        drawLine(
-                            color = Color.Gray,
-                            start = Offset(tableX, lineY),
-                            end = Offset(tableX + tableW, lineY),
-                            strokeWidth = 1f
-                        )
-                    }
-                }
-                is SlideShape.ChartShape -> {
-                    val chartX = shape.x * w
-                    val chartY = shape.y * h
-                    val chartW = shape.width * w
-                    val chartH = shape.height * h
-                    
-                    // Background & Border
                     drawRect(
-                        color = Color.LightGray.copy(alpha = 0.2f),
-                        topLeft = Offset(chartX, chartY),
-                        size = Size(chartW, chartH)
+                        color = Color.LightGray.copy(alpha = 0.25f),
+                        topLeft = Offset(x, y),
+                        size = Size(w, h)
                     )
                     drawRect(
                         color = Color.Gray,
-                        topLeft = Offset(chartX, chartY),
-                        size = Size(chartW, chartH),
-                        style = Stroke(width = 2f)
+                        topLeft = Offset(x, y),
+                        size = Size(w, h),
+                        style = Stroke(width = max(1f, 1.5f * scale))
                     )
 
-                    // Text label for chart type
-                    val label = "Chart: ${shape.type}"
-                    val fontSize = 12f * (w / 400f)
+                    for (c in 1 until cols) {
+                        val lineX = x + c * cellW
+                        drawLine(Color.Gray, Offset(lineX, y), Offset(lineX, y + h), strokeWidth = max(1f, 1f * scale))
+                    }
+                    for (r in 1 until rows) {
+                        val lineY = y + r * cellH
+                        drawLine(Color.Gray, Offset(x, lineY), Offset(x + w, lineY), strokeWidth = max(1f, 1f * scale))
+                    }
+                }
+
+                is SlideShape.ChartShape -> {
+                    val x = sx(shape.x * slideW)
+                    val y = sy(shape.y * slideH)
+                    val w = sw(shape.width * slideW)
+                    val h = sh(shape.height * slideH)
+                    val labelSize = (12f * scale).coerceIn(10f, 18f)
+                    val graphicW = w * 0.6f
+                    val graphicH = h * 0.5f
+                    val graphicX = x + (w - graphicW) / 2f
+                    val graphicY = y + (h - graphicH) / 2f + labelSize
+                    val minDim = min(graphicW, graphicH)
+
+                    drawRect(
+                        color = Color.LightGray.copy(alpha = 0.2f),
+                        topLeft = Offset(x, y),
+                        size = Size(w, h)
+                    )
+                    drawRect(
+                        color = Color.Gray,
+                        topLeft = Offset(x, y),
+                        size = Size(w, h),
+                        style = Stroke(width = max(1f, 1.5f * scale))
+                    )
+
                     drawText(
                         textMeasurer = textMeasurer,
-                        text = label,
-                        topLeft = Offset(chartX + 8f, chartY + 8f),
-                        style = TextStyle(color = Color.DarkGray, fontSize = fontSize.sp, fontWeight = FontWeight.Bold)
+                        text = "Chart: ${shape.type}",
+                        topLeft = Offset(x + 8f * scale, y + 8f * scale),
+                        style = TextStyle(
+                            color = Color.DarkGray,
+                            fontSize = labelSize.sp,
+                            fontWeight = FontWeight.Bold
+                        )
                     )
 
-                    // Mini graphic based on type
-                    val graphicW = chartW * 0.6f
-                    val graphicH = chartH * 0.5f
-                    val graphicX = chartX + (chartW - graphicW) / 2
-                    val graphicY = chartY + (chartH - graphicH) / 2 + fontSize
-                    val minDim = minOf(graphicW, graphicH)
-                    
                     when (shape.type.lowercase()) {
                         "pie" -> {
-                            drawArc(
-                                color = Color.Blue.copy(alpha = 0.5f),
-                                startAngle = 0f,
-                                sweepAngle = 270f,
-                                useCenter = true,
-                                topLeft = Offset(graphicX + (graphicW - minDim) / 2, graphicY + (graphicH - minDim) / 2),
-                                size = Size(minDim, minDim)
-                            )
-                            drawArc(
-                                color = Color.Red.copy(alpha = 0.5f),
-                                startAngle = 270f,
-                                sweepAngle = 90f,
-                                useCenter = true,
-                                topLeft = Offset(graphicX + (graphicW - minDim) / 2, graphicY + (graphicH - minDim) / 2),
-                                size = Size(minDim, minDim)
-                            )
+                            val left = graphicX + (graphicW - minDim) / 2f
+                            val top = graphicY + (graphicH - minDim) / 2f
+                            drawArc(Color.Blue.copy(alpha = 0.5f), 0f, 270f, true, Offset(left, top), Size(minDim, minDim))
+                            drawArc(Color.Red.copy(alpha = 0.5f), 270f, 90f, true, Offset(left, top), Size(minDim, minDim))
                         }
+
                         "bar", "column" -> {
                             val numBars = 4
-                            val barSpacing = graphicW / (numBars * 2)
+                            val barSpacing = graphicW / (numBars * 2f)
                             val barW = barSpacing
                             for (i in 0 until numBars) {
                                 val barHeight = graphicH * (0.3f + 0.2f * i)
@@ -259,22 +258,20 @@ fun SlideCanvas(slide: SlideData, searchQuery: String) {
                                     size = Size(barW, barHeight)
                                 )
                             }
-                            // Axes
-                            drawLine(color = Color.Black, start = Offset(graphicX, graphicY + graphicH), end = Offset(graphicX + graphicW, graphicY + graphicH), strokeWidth = 2f)
-                            drawLine(color = Color.Black, start = Offset(graphicX, graphicY), end = Offset(graphicX, graphicY + graphicH), strokeWidth = 2f)
+                            drawLine(Color.Black, Offset(graphicX, graphicY + graphicH), Offset(graphicX + graphicW, graphicY + graphicH), strokeWidth = max(1f, 2f * scale))
+                            drawLine(Color.Black, Offset(graphicX, graphicY), Offset(graphicX, graphicY + graphicH), strokeWidth = max(1f, 2f * scale))
                         }
+
                         else -> {
-                            // Axes
-                            drawLine(color = Color.Black, start = Offset(graphicX, graphicY + graphicH), end = Offset(graphicX + graphicW, graphicY + graphicH), strokeWidth = 2f)
-                            drawLine(color = Color.Black, start = Offset(graphicX, graphicY), end = Offset(graphicX, graphicY + graphicH), strokeWidth = 2f)
-                            // Line chart points
+                            drawLine(Color.Black, Offset(graphicX, graphicY + graphicH), Offset(graphicX + graphicW, graphicY + graphicH), strokeWidth = max(1f, 2f * scale))
+                            drawLine(Color.Black, Offset(graphicX, graphicY), Offset(graphicX, graphicY + graphicH), strokeWidth = max(1f, 2f * scale))
                             val p1 = Offset(graphicX + graphicW * 0.1f, graphicY + graphicH * 0.8f)
                             val p2 = Offset(graphicX + graphicW * 0.4f, graphicY + graphicH * 0.3f)
                             val p3 = Offset(graphicX + graphicW * 0.7f, graphicY + graphicH * 0.5f)
                             val p4 = Offset(graphicX + graphicW * 0.9f, graphicY + graphicH * 0.1f)
-                            drawLine(color = Color.Blue.copy(alpha = 0.7f), start = p1, end = p2, strokeWidth = 3f)
-                            drawLine(color = Color.Blue.copy(alpha = 0.7f), start = p2, end = p3, strokeWidth = 3f)
-                            drawLine(color = Color.Blue.copy(alpha = 0.7f), start = p3, end = p4, strokeWidth = 3f)
+                            drawLine(Color.Blue.copy(alpha = 0.7f), p1, p2, strokeWidth = max(1f, 3f * scale))
+                            drawLine(Color.Blue.copy(alpha = 0.7f), p2, p3, strokeWidth = max(1f, 3f * scale))
+                            drawLine(Color.Blue.copy(alpha = 0.7f), p3, p4, strokeWidth = max(1f, 3f * scale))
                         }
                     }
                 }
