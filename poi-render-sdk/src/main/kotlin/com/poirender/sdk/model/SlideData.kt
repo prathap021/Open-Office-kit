@@ -25,7 +25,31 @@ sealed class SlideShape {
         val imageData: ByteArray,
         val x: Float, val y: Float,
         val width: Float, val height: Float
-    ) : SlideShape()
+    ) : SlideShape() {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as ImageShape
+
+            if (x != other.x) return false
+            if (y != other.y) return false
+            if (width != other.width) return false
+            if (height != other.height) return false
+            if (!imageData.contentEquals(other.imageData)) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = x.hashCode()
+            result = 31 * result + y.hashCode()
+            result = 31 * result + width.hashCode()
+            result = 31 * result + height.hashCode()
+            result = 31 * result + imageData.contentHashCode()
+            return result
+        }
+    }
 
     data class RectShape(
         val x: Float, val y: Float,

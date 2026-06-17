@@ -54,7 +54,27 @@ sealed class PageElement {
         val imageData: ByteArray,
         val width: Int = 0,
         val height: Int = 0
-    ) : PageElement()
+    ) : PageElement() {
+        override fun equals(other: Any?): Boolean {
+            if (this === other) return true
+            if (javaClass != other?.javaClass) return false
+
+            other as ImageElement
+
+            if (width != other.width) return false
+            if (height != other.height) return false
+            if (!imageData.contentEquals(other.imageData)) return false
+
+            return true
+        }
+
+        override fun hashCode(): Int {
+            var result = width
+            result = 31 * result + height
+            result = 31 * result + imageData.contentHashCode()
+            return result
+        }
+    }
 
     object Divider : PageElement()
 

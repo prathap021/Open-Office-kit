@@ -1,6 +1,6 @@
 package com.poirender.sdk.parser
 
-import android.graphics.Color
+import androidx.core.graphics.toColorInt
 import com.poirender.sdk.model.*
 import org.apache.poi.xwpf.usermodel.*
 import java.io.InputStream
@@ -21,7 +21,7 @@ class DocxParser {
                 if (!author.isNullOrBlank()) elements.add(PageElement.TextElement("Author: $author", isItalic = true))
                 elements.add(PageElement.Divider)
             }
-        } catch (e: Exception) {}
+        } catch (_: Exception) {}
 
         // 2. Headers
         for (header in doc.headerList) {
@@ -87,8 +87,8 @@ class DocxParser {
         val colorHex = firstRun?.color
         if (colorHex != null && colorHex != "auto") {
             try {
-                textColor = Color.parseColor(if (colorHex.startsWith("#")) colorHex else "#$colorHex")
-            } catch (e: Exception) {}
+                textColor = (if (colorHex.startsWith("#")) colorHex else "#$colorHex").toColorInt()
+            } catch (_: Exception) {}
         }
 
         return PageElement.TextElement(
@@ -96,7 +96,7 @@ class DocxParser {
             isBold = firstRun?.isBold ?: false,
             isItalic = firstRun?.isItalic ?: false,
             isUnderline = firstRun?.underline != null && firstRun.underline != UnderlinePatterns.NONE,
-            fontSize = firstRun?.fontSize?.takeIf { it > 0 } ?: 12,
+            fontSize = firstRun?.fontSizeAsDouble?.toInt()?.takeIf { it > 0 } ?: 12,
             color = textColor,
             alignment = when (paragraph.alignment) {
                 ParagraphAlignment.CENTER -> TextAlign.CENTER

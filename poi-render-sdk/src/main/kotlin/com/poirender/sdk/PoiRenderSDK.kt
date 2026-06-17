@@ -1,6 +1,4 @@
 package com.poirender.sdk
-
-import android.annotation.SuppressLint
 import android.content.Context
 import android.net.Uri
 import com.poirender.sdk.model.DocumentPage
@@ -16,21 +14,9 @@ class PoiRenderSDK private constructor(
     private val context: Context
 ) {
     companion object {
-
-        @Volatile private var instance: PoiRenderSDK? = null
-
         fun init(context: Context): PoiRenderSDK {
-            return instance ?: synchronized(this) {
-                instance ?: PoiRenderSDK(
-                    context.applicationContext
-                ).also { instance = it }
-            }
+            return PoiRenderSDK(context.applicationContext)
         }
-
-        fun getInstance(): PoiRenderSDK =
-            instance ?: throw IllegalStateException(
-                "Call PoiRenderSDK.init(context) first"
-            )
     }
 
     suspend fun parseDocx(uri: Uri): Result<List<DocumentPage>> =
