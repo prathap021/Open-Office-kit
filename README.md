@@ -62,11 +62,66 @@ The SDK has been fundamentally aligned with the complete Open Office structure a
     *   **Speaker Notes Panel**: Toggleable drawer containing the presenter's notes for the current slide.
     *   **Navigation Bar**: Prev, Next, and Jump actions.
     *   **Fullscreen Mode**: Tap a slide to hide controls and enter fullscreen slideshow mode.
+*   **Mobile-Fidelity Slide Rendering (New):**
+    *   **Fitted Viewports**: Slides strictly preserve their original aspect ratio and scale responsively to fit the mobile screen, avoiding clipping or distortion.
+    *   **Dynamic Scaling**: Text, shapes, and images use precise scaled coordinate systems relative to the viewport.
+    *   **High Color Fidelity**: Extracts actual run-level font colors and exact shape fill/stroke colors using AWT `PaintStyle` translations.
+    *   **Advanced Shapes**: Draws accurate inner grid lines for `TableShape` using rows/cols data and dynamic miniature representations for `ChartShape` (e.g. Pie, Bar, Line).
 *   **Slide Content Rendering:**
     *   Slide titles, body text, and complex multi-level Bullet Lists.
-    *   Font size, color, bold formatting, and text alignments.
+    *   Font size clamping, color, bold formatting, and text alignments.
     *   Images and Background Fills.
-    *   Basic Shapes (Rectangles), Connectors / Arrows, Charts, and Table placeholders painted precisely via the Jetpack Compose `Canvas`.
+    *   Connectors / Arrows painted precisely via the Jetpack Compose `Canvas`.
+
+## SDK Usage
+
+Integrating `OpenOfficeKit` into your Jetpack Compose application is straightforward. The SDK handles heavy parsing on background threads using coroutines.
+
+### 1. Initialize the SDK
+Initialize the SDK singleton using your application or activity context:
+
+```kotlin
+import com.poirender.sdk.PoiRenderSDK
+
+val officeSDK = PoiRenderSDK.init(context)
+```
+
+### 2. Parse a Document
+Use the provided coroutine suspend functions to safely parse a file URI. You can optionally listen to parsing progress.
+
+```kotlin
+// Example: Parsing a PPTX file
+lifecycleScope.launch {
+    val result = officeSDK.parsePptx(fileUri) { progress ->
+        // progress is a Float between 0.0f and 1.0f
+        Log.d("SDK", "Loading: ${progress * 100}%")
+    }
+
+    result.onSuccess { slides ->
+        // Document parsed successfully!
+        // Pass 'slides' to your Jetpack Compose UI
+    }.onFailure { error ->
+        // Handle parsing error / corrupted file
+    }
+}
+```
+*(Use `parseDocx` for Word documents or `parseExcel` for Spreadsheets)*
+
+### 3. Render in Jetpack Compose
+Pass the parsed data directly to the built-in Compose renderers. They are highly optimized and handle all native drawing.
+
+```kotlin
+import com.poirender.sdk.renderer.PptxRenderer
+
+@Composable
+fun DocumentViewerScreen(slides: List<SlideData>) {
+    // Renders the fully featured PPTX viewer
+    PptxRenderer(
+        slides = slides,
+        searchQuery = "" // Optional: dynamically highlight matching text
+    )
+}
+```
 
 ## Getting Started
-The `app` module contains a sample `DocumentViewerActivity`. Simply launch it, pick an office file, and the SDK will automatically read the POI stream and trigger the appropriate `DocxRenderer`, `ExcelRenderer`, or `PptxRenderer`.
+The `app` module contains a complete sample `DocumentViewerActivity`. Simply launch it, pick an office file, and the SDK will automatically read the POI stream and trigger the appropriate parser and renderer.
