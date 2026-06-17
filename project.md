@@ -18,7 +18,7 @@ This module acts as the heavy-lifting engine for the project. It removes the com
 - **Renderers (`renderer/`)**:
   - `DocxRenderer`: Generates a lazy-loaded rich text document using Compose `AnnotatedString` and nested `Row`/`Column` setups.
   - `ExcelRenderer`: Implements a high-performance, absolutely-positioned Compose `Box` grid, accurately laying out complex spreadsheet cells (including merges) while skipping obscured geometries.
-  - `PptxRenderer`: Implements a full slideshow viewer using a `HorizontalPager`, a bottom toolbar for presentation features (Thumbnails, Notes), and a custom `Canvas` capable of drawing vector shapes, text, and images precisely.
+  - `PptxRenderer`: Implements a full vertical-scrolling slideshow viewer using a `LazyColumn`, eliminating mobile collapse issues. It uses a fitted viewport coordinate system inside a custom `Canvas` capable of accurately scaling and drawing vector shapes, text clamped to safe bounds, images, and dynamic grids/placeholders for tables and charts precisely relative to the slide's original aspect ratio.
 
 ### 2. `app` (The Implementation Demo)
 The `app` module demonstrates the exact way to implement `poi-render-sdk` into a modern Android ecosystem.
