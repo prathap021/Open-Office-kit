@@ -15,7 +15,7 @@ class PptxParser {
         val ppt: SlideShow<*, *>
         try {
             ppt = SlideShowFactory.create(inputStream)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             SDKLog.e(TAG, "Critical Error parsing PPT/PPTX file header", e)
             throw e
         }
@@ -49,8 +49,8 @@ class PptxParser {
                                 for (p in shape.textParagraphs) {
                                     val hasBullet = try {
                                         p.javaClass.getMethod("isBullet").invoke(p) as? Boolean ?: false
-                                    } catch (_: Exception) {
-                                        try { p.bulletStyle != null } catch (_: Exception) { false }
+                                    } catch (_: Throwable) {
+                                        try { p.bulletStyle != null } catch (_: Throwable) { false }
                                     }
                                     if (hasBullet) sb.append("• ")
                                     for (run in p.textRuns) {
@@ -89,17 +89,53 @@ class PptxParser {
                                 )
                             }
                         }
-                    } catch (e: Exception) {
+                    } catch (e: Throwable) {
                         SDKLog.w(TAG, "Warning: Failed to parse a specific shape on slide $index", e)
                     }
                 }
-            } catch (e: Exception) {
+            } catch (e: Throwable) {
                 SDKLog.w(TAG, "Warning: Failed to iterate shapes on slide $index", e)
             }
-            slides.add(SlideData(index = index, shapes = shapes))
+            
+            var notesText: String? = null
+            try {
+                val notesObj = slide.javaClass.getMethod("getNotes").invoke(slide)
+                if (notesObj != null) {
+                    val textParagraphsList = notesObj.javaClass.getMethod("getTextParagraphs").invoke(notesObj) as? List<*>
+                    if (textParagraphsList != null) {
+                        val sb = java.lang.StringBuilder()
+                        for (p in textParagraphsList) {
+                            if (p == null) continue
+                            val textRunsList = p.javaClass.getMethod("getTextRuns").invoke(p) as? List<*>
+                            if (textRunsList != null) {
+                                for (run in textRunsList) {
+                                    if (run == null) continue
+                                    val text = run.javaClass.getMethod("getRawText").invoke(run) as? String
+                                    if (text != null) sb.append(text)
+                                }
+                                sb.append("\n")
+                            }
+                        }
+                        notesText = sb.toString().trimEnd()
+                    }
+                }
+            } catch (e: Throwable) {
+                // Ignore notes extraction failure
+            }
+
+            slides.add(
+                SlideData(
+                    index = index,
+                    shapes = shapes,
+                    slideWidth = slideW,
+                    slideHeight = slideH,
+                    slideNumber = index + 1,
+                    notes = notesText?.takeIf { it.isNotBlank() }
+                )
+            )
             onProgress?.invoke((index + 1).toFloat() / totalSlides)
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             SDKLog.e(TAG, "Error parsing pptx: ${e.message}", e)
         } finally {
             ppt.close()

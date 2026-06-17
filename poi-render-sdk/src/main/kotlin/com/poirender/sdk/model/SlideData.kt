@@ -6,8 +6,12 @@ data class SlideData(
     val notes: String? = null,
     val backgroundColor: Int = 0xFFFFFFFF.toInt(),
     val slideNumber: Int? = null,
-    val transition: String? = null
-)
+    val transition: String? = null,
+    val slideWidth: Float = 0f,
+    val slideHeight: Float = 0f
+) {
+    val aspectRatio: Float get() = if (slideWidth > 0 && slideHeight > 0) slideWidth / slideHeight else 16f / 9f
+}
 
 sealed class SlideShape {
 

@@ -26,7 +26,7 @@ class DocxParser {
                 if (!author.isNullOrBlank()) elements.add(PageElement.TextElement("Author: $author", isItalic = true))
                 elements.add(PageElement.Divider)
             }
-        } catch (_: Exception) {}
+        } catch (_: Throwable) {}
         onProgress?.invoke(0.1f)
 
         try {
@@ -54,7 +54,7 @@ class DocxParser {
             }
         }
             onProgress?.invoke(1.0f)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             SDKLog.e(TAG, "Error parsing docx: ${e.message}", e)
         } finally {
             doc.close()
@@ -68,8 +68,16 @@ class DocxParser {
             is XWPFParagraph -> {
                 // Extract inline pictures from runs
                 for (run in bodyElement.runs) {
-                    for (pic in run.embeddedPictures) {
-                        elements.add(PageElement.ImageElement(pic.pictureData.data))
+                    try {
+                        for (pic in run.embeddedPictures) {
+                            try {
+                                elements.add(PageElement.ImageElement(pic.pictureData.data))
+                            } catch (e: Throwable) {
+                                SDKLog.w(TAG, "Warning: Failed to extract a specific picture", e)
+                            }
+                        }
+                    } catch (e: Throwable) {
+                        SDKLog.w(TAG, "Warning: Failed to read embedded pictures in run", e)
                     }
                 }
 
@@ -103,7 +111,7 @@ class DocxParser {
         if (colorHex != null && colorHex != "auto") {
             try {
                 textColor = (if (colorHex.startsWith("#")) colorHex else "#$colorHex").toColorInt()
-            } catch (_: Exception) {}
+            } catch (_: Throwable) {}
         }
 
         return PageElement.TextElement(
