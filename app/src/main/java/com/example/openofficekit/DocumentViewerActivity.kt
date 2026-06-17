@@ -1,6 +1,7 @@
 package com.example.openofficekit
 import android.os.Bundle
 import android.provider.OpenableColumns
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -32,6 +33,10 @@ import androidx.core.net.toUri
 
 class DocumentViewerActivity : ComponentActivity() {
 
+    companion object {
+        private const val TAG = "DocumentViewer"
+    }
+
     private lateinit var sdk: PoiRenderSDK
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -46,6 +51,7 @@ class DocumentViewerActivity : ComponentActivity() {
             return
         }
         val uri = uriString.toUri()
+        Log.d(TAG, "Opening document: $uri")
 
         var initialDocName = "unknown"
         contentResolver.query(uri, null, null, null, null)?.use { cursor ->
@@ -57,6 +63,7 @@ class DocumentViewerActivity : ComponentActivity() {
         if (initialDocName == "unknown") {
             initialDocName = uri.lastPathSegment ?: "unknown"
         }
+        Log.d(TAG, "Resolved document name: $initialDocName")
 
         setContent {
             var isDarkMode by remember { mutableStateOf(false) }
@@ -96,21 +103,47 @@ class DocumentViewerActivity : ComponentActivity() {
                     }
 
                     coroutineScope.launch {
-                        val onProgress: (Float) -> Unit = { progressValue = it }
+                        Log.d(TAG, "Starting to parse document: $initialDocName")
+                        val onProgress: (Float) -> Unit = { 
+                            progressValue = it 
+                            Log.v(TAG, "Loading progress: ${(it * 100).toInt()}%")
+                        }
                         when {
                             initialDocName.endsWith(".docx", true) -> {
-                                sdk.parseDocx(uri, onProgress).onSuccess { docxPages = it; isLoading = false }
-                                    .onFailure { errorMessage = it.message; isLoading = false }
+                                Log.i(TAG, "Parsing as DOCX")
+                                sdk.parseDocx(uri, onProgress).onSuccess { 
+                                    docxPages = it; isLoading = false 
+                                    Log.i(TAG, "DOCX parsed successfully: ${it.size} pages")
+                                }
+                                    .onFailure { 
+                                        errorMessage = it.message; isLoading = false 
+                                        Log.e(TAG, "Failed to parse DOCX", it)
+                                    }
                             }
                             initialDocName.endsWith(".pptx", true) || initialDocName.endsWith(".ppt", true) -> {
-                                sdk.parsePptx(uri, onProgress).onSuccess { pptxSlides = it; isLoading = false }
-                                    .onFailure { errorMessage = it.message; isLoading = false }
+                                Log.i(TAG, "Parsing as PPTX")
+                                sdk.parsePptx(uri, onProgress).onSuccess { 
+                                    pptxSlides = it; isLoading = false 
+                                    Log.i(TAG, "PPTX parsed successfully: ${it.size} slides")
+                                }
+                                    .onFailure { 
+                                        errorMessage = it.message; isLoading = false 
+                                        Log.e(TAG, "Failed to parse PPTX", it)
+                                    }
                             }
                             initialDocName.endsWith(".xlsx", true) || initialDocName.endsWith(".xls", true) -> {
-                                sdk.parseExcel(uri, onProgress).onSuccess { excelWorkbook = it; isLoading = false }
-                                    .onFailure { errorMessage = it.message; isLoading = false }
+                                Log.i(TAG, "Parsing as EXCEL")
+                                sdk.parseExcel(uri, onProgress).onSuccess { 
+                                    excelWorkbook = it; isLoading = false 
+                                    Log.i(TAG, "Excel parsed successfully: ${it.sheets.size} sheets")
+                                }
+                                    .onFailure { 
+                                        errorMessage = it.message; isLoading = false 
+                                        Log.e(TAG, "Failed to parse Excel", it)
+                                    }
                             }
                             else -> {
+                                Log.w(TAG, "Unsupported file type: $initialDocName")
                                 errorMessage = "Unsupported file type: Please provide a valid DOCX, XLSX, or PPTX file."
                                 isLoading = false
                             }

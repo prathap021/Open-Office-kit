@@ -1,19 +1,25 @@
 package com.poirender.sdk.parser
 
 import com.poirender.sdk.model.*
+import com.poirender.sdk.util.SDKLog
 import org.apache.poi.ss.usermodel.DataFormatter
 import org.apache.poi.ss.usermodel.WorkbookFactory
 import java.io.InputStream
 
 class ExcelParser {
+    private val TAG = "ExcelParser"
+
     fun parse(inputStream: InputStream, onProgress: ((Float) -> Unit)? = null): WorkbookData {
+        SDKLog.d(TAG, "Starting Excel parse")
         onProgress?.invoke(0.05f)
         val workbook = WorkbookFactory.create(inputStream)
         val formatter = DataFormatter()
         val sheets = mutableListOf<SheetData>()
         val totalSheets = workbook.numberOfSheets
+        SDKLog.i(TAG, "Document has $totalSheets sheets")
 
-        for (i in 0 until totalSheets) {
+        try {
+            for (i in 0 until totalSheets) {
             val sheet = workbook.getSheetAt(i)
             val rows = mutableListOf<RowData>()
             val mergedRegions = sheet.mergedRegions
@@ -57,9 +63,13 @@ class ExcelParser {
             }
             sheets.add(SheetData(sheet.sheetName, rows))
             onProgress?.invoke((i + 1).toFloat() / totalSheets)
+            }
+        } catch (e: Exception) {
+            SDKLog.e(TAG, "Error parsing excel: ${e.message}", e)
+        } finally {
+            workbook.close()
         }
-
-        workbook.close()
+        SDKLog.d(TAG, "Finished parsing Excel: ${sheets.size} sheets found")
         return WorkbookData(sheets)
     }
 }

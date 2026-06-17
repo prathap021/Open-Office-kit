@@ -1,30 +1,35 @@
 package com.poirender.sdk.parser
 
 import com.poirender.sdk.model.*
+import com.poirender.sdk.util.SDKLog
 import org.apache.poi.sl.usermodel.*
 import java.io.InputStream
 
 class PptxParser {
+    private val TAG = "PptxParser"
 
     fun parse(inputStream: InputStream, onProgress: ((Float) -> Unit)? = null): List<SlideData> {
+        SDKLog.d(TAG, "Starting PPTX parse")
         onProgress?.invoke(0.05f)
         // Create the SlideShow from the InputStream (supports both binary PPT and XML PPTX)
         val ppt: SlideShow<*, *>
         try {
             ppt = SlideShowFactory.create(inputStream)
         } catch (e: Exception) {
-            println("Critical Error parsing PPT/PPTX file header: ${e.message}")
+            SDKLog.e(TAG, "Critical Error parsing PPT/PPTX file header", e)
             throw e
         }
 
         val slides = mutableListOf<SlideData>()
         val totalSlides = ppt.slides.size
+        SDKLog.i(TAG, "Document has $totalSlides slides")
 
         val pageSize = ppt.pageSize
         val slideW = pageSize.width.toFloat()
         val slideH = pageSize.height.toFloat()
 
-        for ((index, slide) in ppt.slides.withIndex()) {
+        try {
+            for ((index, slide) in ppt.slides.withIndex()) {
             val shapes = mutableListOf<SlideShape>()
 
             try {
@@ -85,17 +90,21 @@ class PptxParser {
                             }
                         }
                     } catch (e: Exception) {
-                        println("Warning: Failed to parse a specific shape on slide $index. (Likely corrupted OLE/ExEmbedAtom record). Message: ${e.message}")
+                        SDKLog.w(TAG, "Warning: Failed to parse a specific shape on slide $index", e)
                     }
                 }
             } catch (e: Exception) {
-                println("Warning: Failed to iterate shapes on slide $index due to record reading issue. Message: ${e.message}")
+                SDKLog.w(TAG, "Warning: Failed to iterate shapes on slide $index", e)
             }
             slides.add(SlideData(index = index, shapes = shapes))
             onProgress?.invoke((index + 1).toFloat() / totalSlides)
+            }
+        } catch (e: Exception) {
+            SDKLog.e(TAG, "Error parsing pptx: ${e.message}", e)
+        } finally {
+            ppt.close()
         }
-
-        ppt.close()
+        SDKLog.d(TAG, "Finished parsing PPTX: ${slides.size} slides found")
         return slides
     }
 }

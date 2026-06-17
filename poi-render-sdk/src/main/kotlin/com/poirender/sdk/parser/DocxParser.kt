@@ -2,12 +2,15 @@ package com.poirender.sdk.parser
 
 import androidx.core.graphics.toColorInt
 import com.poirender.sdk.model.*
+import com.poirender.sdk.util.SDKLog
 import org.apache.poi.xwpf.usermodel.*
 import java.io.InputStream
 
 class DocxParser {
+    private val TAG = "DocxParser"
 
     fun parse(inputStream: InputStream, onProgress: ((Float) -> Unit)? = null): List<DocumentPage> {
+        SDKLog.d(TAG, "Starting DOCX parse")
         onProgress?.invoke(0.05f)
         val doc = XWPFDocument(inputStream)
         val elements = mutableListOf<PageElement>()
@@ -17,6 +20,7 @@ class DocxParser {
             val props = doc.properties.coreProperties
             val title = props.title
             val author = props.creator
+            SDKLog.i(TAG, "Document Title: $title, Author: $author")
             if (!title.isNullOrBlank() || !author.isNullOrBlank()) {
                 if (!title.isNullOrBlank()) elements.add(PageElement.HeadingElement(title, 1))
                 if (!author.isNullOrBlank()) elements.add(PageElement.TextElement("Author: $author", isItalic = true))
@@ -25,7 +29,8 @@ class DocxParser {
         } catch (_: Exception) {}
         onProgress?.invoke(0.1f)
 
-        // 2. Headers
+        try {
+            // 2. Headers
         for (header in doc.headerList) {
             for (bodyElement in header.bodyElements) {
                 parseBodyElement(bodyElement, elements)
@@ -48,9 +53,13 @@ class DocxParser {
                 parseBodyElement(bodyElement, elements)
             }
         }
-        onProgress?.invoke(1.0f)
-
-        doc.close()
+            onProgress?.invoke(1.0f)
+        } catch (e: Exception) {
+            SDKLog.e(TAG, "Error parsing docx: ${e.message}", e)
+        } finally {
+            doc.close()
+        }
+        SDKLog.d(TAG, "Finished parsing DOCX: ${elements.size} elements found")
         return listOf(DocumentPage(elements))
     }
 
