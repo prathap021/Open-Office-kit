@@ -1,6 +1,4 @@
 package com.example.openofficekit
-
-import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.widget.Toast
@@ -12,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -29,6 +28,7 @@ import com.poirender.sdk.renderer.ExcelRenderer
 import com.poirender.sdk.renderer.PptxRenderer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import androidx.core.net.toUri
 
 class DocumentViewerActivity : ComponentActivity() {
 
@@ -45,7 +45,7 @@ class DocumentViewerActivity : ComponentActivity() {
             finish()
             return
         }
-        val uri = Uri.parse(uriString)
+        val uri = uriString.toUri()
 
         var initialDocName = "unknown"
         contentResolver.query(uri, null, null, null, null)?.use { cursor ->
@@ -61,7 +61,7 @@ class DocumentViewerActivity : ComponentActivity() {
         setContent {
             var isDarkMode by remember { mutableStateOf(false) }
             var isHighContrast by remember { mutableStateOf(false) }
-            var textScale by remember { mutableStateOf(1f) }
+            var textScale by remember { mutableFloatStateOf(1f) }
 
             MaterialTheme(
                 colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
@@ -76,7 +76,7 @@ class DocumentViewerActivity : ComponentActivity() {
                 
                 var errorMessage by remember { mutableStateOf<String?>(null) }
                 var isLoading by remember { mutableStateOf(true) }
-                var progressValue by remember { mutableStateOf(0f) }
+                var progressValue by remember { mutableFloatStateOf(0f) }
                 
                 var requiresPassword by remember { mutableStateOf(false) }
 
@@ -122,9 +122,9 @@ class DocumentViewerActivity : ComponentActivity() {
                     loadDocument()
                 }
 
-                var scale by remember { mutableStateOf(1f) }
-                var offsetX by remember { mutableStateOf(0f) }
-                var offsetY by remember { mutableStateOf(0f) }
+                var scale by remember { mutableFloatStateOf(1f) }
+                var offsetX by remember { mutableFloatStateOf(0f) }
+                var offsetY by remember { mutableFloatStateOf(0f) }
                 var showMenu by remember { mutableStateOf(false) }
 
                 Scaffold(
@@ -150,11 +150,19 @@ class DocumentViewerActivity : ComponentActivity() {
                                     DropdownMenuItem(text = { Text("Print") }, onClick = { showMenu = false; Toast.makeText(this@DocumentViewerActivity, "Print...", Toast.LENGTH_SHORT).show() })
                                     DropdownMenuItem(text = { Text("Share Link") }, onClick = { showMenu = false; Toast.makeText(this@DocumentViewerActivity, "Sharing...", Toast.LENGTH_SHORT).show() })
                                     DropdownMenuItem(text = { Text("Download File") }, onClick = { showMenu = false; Toast.makeText(this@DocumentViewerActivity, "Downloading...", Toast.LENGTH_SHORT).show() })
-                                    Divider()
+                                    HorizontalDivider(
+                                        Modifier,
+                                        DividerDefaults.Thickness,
+                                        DividerDefaults.color
+                                    )
                                     DropdownMenuItem(text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") }, onClick = { isDarkMode = !isDarkMode; showMenu = false })
                                     DropdownMenuItem(text = { Text(if (isHighContrast) "Normal Contrast" else "High Contrast") }, onClick = { isHighContrast = !isHighContrast; showMenu = false })
                                     DropdownMenuItem(text = { Text("Text Size Override (+20%)") }, onClick = { textScale += 0.2f; showMenu = false })
-                                    Divider()
+                                    HorizontalDivider(
+                                        Modifier,
+                                        DividerDefaults.Thickness,
+                                        DividerDefaults.color
+                                    )
                                     DropdownMenuItem(text = { Text("Zoom 50%") }, onClick = { scale = 0.5f; offsetX = 0f; offsetY = 0f; showMenu = false })
                                     DropdownMenuItem(text = { Text("Zoom 75%") }, onClick = { scale = 0.75f; offsetX = 0f; offsetY = 0f; showMenu = false })
                                     DropdownMenuItem(text = { Text("Zoom 100%") }, onClick = { scale = 1.0f; offsetX = 0f; offsetY = 0f; showMenu = false })
