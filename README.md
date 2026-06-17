@@ -86,40 +86,73 @@ import com.poirender.sdk.PoiRenderSDK
 val officeSDK = PoiRenderSDK.init(context)
 ```
 
-### 2. Parse a Document
-Use the provided coroutine suspend functions to safely parse a file URI. You can optionally listen to parsing progress.
+### 2. Parse and Render Documents
 
+The SDK provides specific coroutine suspend functions to safely parse file URIs, alongside corresponding highly-optimized Composable renderers.
+
+#### Word Documents (DOCX)
 ```kotlin
-// Example: Parsing a PPTX file
-lifecycleScope.launch {
-    val result = officeSDK.parsePptx(fileUri) { progress ->
-        // progress is a Float between 0.0f and 1.0f
-        Log.d("SDK", "Loading: ${progress * 100}%")
-    }
+import com.poirender.sdk.renderer.DocxRenderer
 
-    result.onSuccess { slides ->
-        // Document parsed successfully!
-        // Pass 'slides' to your Jetpack Compose UI
+// 1. Parsing
+lifecycleScope.launch {
+    officeSDK.parseDocx(fileUri) { progress ->
+        Log.d("SDK", "Loading DOCX: ${progress * 100}%")
+    }.onSuccess { pages ->
+        // 2. Rendering in Compose
+        setContent {
+            DocxRenderer(
+                pages = pages,
+                searchQuery = "" // Optional: dynamically highlight matching text
+            )
+        }
     }.onFailure { error ->
-        // Handle parsing error / corrupted file
+        Log.e("SDK", "Error parsing DOCX", error)
     }
 }
 ```
-*(Use `parseDocx` for Word documents or `parseExcel` for Spreadsheets)*
 
-### 3. Render in Jetpack Compose
-Pass the parsed data directly to the built-in Compose renderers. They are highly optimized and handle all native drawing.
+#### Excel Spreadsheets (XLSX)
+```kotlin
+import com.poirender.sdk.renderer.ExcelRenderer
 
+// 1. Parsing
+lifecycleScope.launch {
+    officeSDK.parseExcel(fileUri) { progress ->
+        Log.d("SDK", "Loading Excel: ${progress * 100}%")
+    }.onSuccess { workbookData ->
+        // 2. Rendering in Compose
+        setContent {
+            ExcelRenderer(
+                workbookData = workbookData,
+                searchQuery = "" // Optional: dynamically highlight matching text
+            )
+        }
+    }.onFailure { error ->
+        Log.e("SDK", "Error parsing Excel", error)
+    }
+}
+```
+
+#### PowerPoint Presentations (PPTX)
 ```kotlin
 import com.poirender.sdk.renderer.PptxRenderer
 
-@Composable
-fun DocumentViewerScreen(slides: List<SlideData>) {
-    // Renders the fully featured PPTX viewer
-    PptxRenderer(
-        slides = slides,
-        searchQuery = "" // Optional: dynamically highlight matching text
-    )
+// 1. Parsing
+lifecycleScope.launch {
+    officeSDK.parsePptx(fileUri) { progress ->
+        Log.d("SDK", "Loading PPTX: ${progress * 100}%")
+    }.onSuccess { slides ->
+        // 2. Rendering in Compose
+        setContent {
+            PptxRenderer(
+                slides = slides,
+                searchQuery = "" // Optional: dynamically highlight matching text
+            )
+        }
+    }.onFailure { error ->
+        Log.e("SDK", "Error parsing PPTX", error)
+    }
 }
 ```
 
