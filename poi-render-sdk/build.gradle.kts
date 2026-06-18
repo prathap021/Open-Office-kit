@@ -23,6 +23,12 @@ android {
 
 
 
+    publishing {
+        singleVariant("release") {
+            withSourcesJar()
+        }
+    }
+
     packaging {
         resources {
             excludes += setOf(
@@ -66,4 +72,29 @@ dependencies {
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
     implementation(libs.androidx.compose.material3)
+}
+
+publishing {
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/prathap021/Open-Office-kit")
+            credentials {
+                username = System.getenv("GITHUB_ACTOR") ?: "prathap021"
+                password = System.getenv("GITHUB_TOKEN")
+            }
+        }
+    }
+
+    publications {
+        register<MavenPublication>("release") {
+            groupId = "com.poirender.sdk"
+            artifactId = "openofficekit"
+            version = "0.1.0-beta"
+
+            afterEvaluate {
+                from(components["release"])
+            }
+        }
+    }
 }
