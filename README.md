@@ -1,5 +1,7 @@
 # OpenOfficeKit
 
+[![Release](https://jitpack.io/v/prathap021/Open-Office-kit.svg)](https://jitpack.io/#prathap021/Open-Office-kit)
+
 OpenOfficeKit is an advanced, native Jetpack Compose SDK for parsing and rendering Microsoft Office documents (DOCX, XLSX, PPTX) directly in Android using Apache POI.
 
 ## Features Supported
@@ -72,6 +74,29 @@ The SDK has been fundamentally aligned with the complete Open Office structure a
     *   Font size clamping, color, bold formatting, and text alignments.
     *   Images and Background Fills.
     *   Connectors / Arrows painted precisely via the Jetpack Compose `Canvas`.
+
+## Installation (JitPack)
+
+Add the JitPack repository to your `settings.gradle.kts` or `build.gradle.kts` (project level):
+
+```kotlin
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+```
+
+Add the dependency to your app's `build.gradle.kts`:
+
+```kotlin
+dependencies {
+    implementation("com.github.prathap021:Open-Office-kit:v0.1.0-beta")
+}
+```
 
 ## SDK Usage
 
