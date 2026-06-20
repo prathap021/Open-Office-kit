@@ -2,78 +2,49 @@
 
 [![Release](https://jitpack.io/v/prathap021/Open-Office-kit.svg)](https://jitpack.io/#prathap021/Open-Office-kit)
 
-OpenOfficeKit is an advanced, native Jetpack Compose SDK for parsing and rendering Microsoft Office documents (DOCX, XLSX, PPTX) directly in Android using Apache POI.
+OpenOfficeKit is an advanced, hybrid SDK for parsing and rendering Microsoft Office documents (both Modern XML like DOCX, XLSX, PPTX, and Legacy OLE2 like DOC, XLS) directly in Android using Apache POI and high-performance WebViews embedded in Jetpack Compose.
 
 ## Features Supported
 
-The SDK has been fundamentally aligned with the complete Open Office structure and supports a rich variety of content out-of-the-box via Jetpack Compose.
+The SDK has been fundamentally aligned with the complete Open Office structure and supports a rich variety of content out-of-the-box via highly modular Compose WebViews.
 
 ### 📱 Core Viewer Capabilities (Shared Features)
-*   **Navigation:** Smooth Pinch-to-zoom and Pan/Drag gestures via native Compose pointers.
-*   **Zoom Controls:** Toolbar dropdown for exact scaling (50%, 75%, 100%, Fit to Width / Screen).
-*   **Toolbar & Search:** Persistent TopAppBar with File Name, Format Badge, and an interactive Search/Find field that highlights text across all document types.
-*   **Utility Menu:** Overflow options for Printing, Sharing links, and Downloading files.
+*   **High Performance Rendering:** Uses a native Compose AndroidView wrapping a specialized WebView to convert extracted Apache POI document models into highly scalable, responsive HTML/CSS structures.
+*   **Legacy Format Support:** Seamlessly parses both newer XML formats (`.docx`, `.xlsx`, `.pptx`) and older OLE2 formats (`.doc`, `.xls`) utilizing `poi-scratchpad` fallback logic.
+*   **Native Searching:** Integrated `TopAppBar` search bar using the underlying WebView's native search engine (`findAllAsync` and `findNext`), allowing blazing fast text search with Next/Previous highlighting without breaking scroll state.
+*   **Dynamic UI Theming:** The toolbar and document backgrounds automatically theme themselves to match the specific file type (Word Blue, Excel Green, PowerPoint Red) using native `colors.xml` parameters.
 *   **Accessibility:**
     *   Dark / Light Mode toggle.
-    *   Text Size Overrides (+20% zooming).
-    *   High Contrast toggle.
-    *   Loading Skeleton UI while background threads parse the file.
+    *   Dynamic Text Scaling/Zoom parameters injected directly into the HTML engine.
+    *   Loading Skeleton UI while background coroutines parse the file.
 *   **Error & Edge States:**
     *   Password-protected file lock prompts.
     *   "Unsupported file type" and corrupted file error screens.
-    *   "Failed to load" states with manual Retry buttons.
 
-### 📄 DOCX (Word Documents)
+### 📄 DOCX & DOC (Word Documents)
 *   **Headings:** H1-H6 scaled appropriately.
-*   **Paragraphs & Runs:** Supports complex inline text formats containing:
+*   **Paragraphs & Runs:** Supports complex inline text formats via `TextRun` extraction:
     *   Bold, Italic, Underline
-    *   Strikethrough
-    *   Superscript / Subscript
-    *   Highlights / Colors
-    *   Hyperlinks
+    *   Mixed text colors and highlighting within the same paragraph.
 *   **Lists:** Ordered, Unordered, and Nested / Indented lists via text formatting.
 *   **Tables:** 
-    *   Row and column structures natively built with Compose.
-    *   Merged cells (colSpan & rowSpan).
-    *   Cell borders, background shading, and text alignment.
-*   **Media & Layout:**
-    *   Inline Images.
-    *   Paragraph indentation and line spacing.
-    *   Page breaks and Dividers.
-    *   Footnotes / Endnotes references.
+    *   Accurate cell grid systems with native HTML `colspan` and `rowspan` behavior.
+    *   Extracts native cell background colors and inner paragraph formatting.
 
-### 📊 XLSX (Excel Spreadsheets)
-*   **Sheet Structure:**
-    *   Tabbed interface for navigating multiple sheets.
-    *   Complete grid UI using a specialized absolute Compose `Box` layout.
-    *   Accurate render of Merged Cells spanning both rows and columns.
-    *   Frozen panes and Hidden rows/columns mapping capabilities.
-*   **Cell Content:**
-    *   Text, Boolean, and Number values mapping.
-    *   Formula extraction and display.
-    *   Comments / notes attached to specific cells.
+### 📊 XLSX & XLS (Excel Spreadsheets)
+*   **Responsive Grid:** Horizontal scrolling HTML tables mapped directly to spreadsheet sheets.
+*   **Cell Content:** Text, Boolean, and Number values mapped seamlessly.
 *   **Cell Formatting:**
-    *   Bold, Italic, Underline, and Text Wrap.
-    *   Number formats (%, $, etc.)
-    *   Fill / Background color and Text color.
-    *   Cell borders and Text alignment.
+    *   Extracts literal Hex `backgroundColor` and `textColor` from cells and applies them inline.
+    *   Bold, Italic, Underline properties.
+    *   Correct parsing of merged cells across rows and columns.
 
 ### 📽️ PPTX (PowerPoint Presentations)
-*   **Presentation Navigation UI:**
-    *   **Slide Thumbnail Panel**: Scrollable horizontal panel to tap and jump to any slide.
-    *   **Speaker Notes Panel**: Toggleable drawer containing the presenter's notes for the current slide.
-    *   **Navigation Bar**: Prev, Next, and Jump actions.
-    *   **Fullscreen Mode**: Tap a slide to hide controls and enter fullscreen slideshow mode.
-*   **Mobile-Fidelity Slide Rendering (New):**
-    *   **Fitted Viewports**: Slides strictly preserve their original aspect ratio and scale responsively to fit the mobile screen, avoiding clipping or distortion.
-    *   **Dynamic Scaling**: Text, shapes, and images use precise scaled coordinate systems relative to the viewport.
-    *   **High Color Fidelity**: Extracts actual run-level font colors and exact shape fill/stroke colors using AWT `PaintStyle` translations.
-    *   **Advanced Shapes**: Draws accurate inner grid lines for `TableShape` using rows/cols data and dynamic miniature representations for `ChartShape` (e.g. Pie, Bar, Line).
-*   **Slide Content Rendering:**
-    *   Slide titles, body text, and complex multi-level Bullet Lists.
-    *   Font size clamping, color, bold formatting, and text alignments.
-    *   Images and Background Fills.
-    *   Connectors / Arrows painted precisely via the Jetpack Compose `Canvas`.
+*   **Presentation Flow:** Renders slides chronologically in a scrolling web view.
+*   **Dynamic Theming:** Extracts individual `slide.backgroundColor` or falls back to standard PPTX dark/light themes.
+*   **Shape Extraction:**
+    *   Text shapes maintain exact relative font sizing and Hex font coloring.
+    *   Images are seamlessly converted to `Base64` and embedded into the HTML flow.
 
 ## Installation (JitPack)
 
@@ -100,7 +71,7 @@ dependencies {
 
 ## SDK Usage
 
-Integrating `OpenOfficeKit` into your Jetpack Compose application is straightforward. The SDK handles heavy parsing on background threads using coroutines.
+Integrating `OpenOfficeKit` into your Jetpack Compose application is straightforward. The SDK handles heavy parsing on background threads and exposes customized WebViews for each file type.
 
 ### 1. Initialize the SDK
 Initialize the SDK singleton using your application or activity context:
@@ -113,11 +84,9 @@ val officeSDK = PoiRenderSDK.init(context)
 
 ### 2. Parse and Render Documents
 
-The SDK provides specific coroutine suspend functions to safely parse file URIs, alongside corresponding highly-optimized Composable renderers.
-
-#### Word Documents (DOCX)
+#### Word Documents (DOCX / DOC)
 ```kotlin
-import com.poirender.sdk.renderer.DocxRenderer
+import com.poirender.sdk.renderer.DocxWebView
 
 // 1. Parsing
 lifecycleScope.launch {
@@ -126,9 +95,13 @@ lifecycleScope.launch {
     }.onSuccess { pages ->
         // 2. Rendering in Compose
         setContent {
-            DocxRenderer(
-                pages = pages,
-                searchQuery = "" // Optional: dynamically highlight matching text
+            DocxWebView(
+                docxPages = pages,
+                isDarkMode = false,
+                textScale = 1f,
+                onWebViewCreated = { webView -> 
+                    // Optional: Reference the WebView to use native methods like webView.findAllAsync("Search Text")
+                }
             )
         }
     }.onFailure { error ->
@@ -137,9 +110,9 @@ lifecycleScope.launch {
 }
 ```
 
-#### Excel Spreadsheets (XLSX)
+#### Excel Spreadsheets (XLSX / XLS)
 ```kotlin
-import com.poirender.sdk.renderer.ExcelRenderer
+import com.poirender.sdk.renderer.ExcelWebView
 
 // 1. Parsing
 lifecycleScope.launch {
@@ -148,9 +121,13 @@ lifecycleScope.launch {
     }.onSuccess { workbookData ->
         // 2. Rendering in Compose
         setContent {
-            ExcelRenderer(
-                workbookData = workbookData,
-                searchQuery = "" // Optional: dynamically highlight matching text
+            ExcelWebView(
+                excelWorkbook = workbookData,
+                isDarkMode = false,
+                textScale = 1f,
+                onWebViewCreated = { webView -> 
+                    // Store WebView reference for Search navigation
+                }
             )
         }
     }.onFailure { error ->
@@ -161,7 +138,7 @@ lifecycleScope.launch {
 
 #### PowerPoint Presentations (PPTX)
 ```kotlin
-import com.poirender.sdk.renderer.PptxRenderer
+import com.poirender.sdk.renderer.PptxWebView
 
 // 1. Parsing
 lifecycleScope.launch {
@@ -170,9 +147,13 @@ lifecycleScope.launch {
     }.onSuccess { slides ->
         // 2. Rendering in Compose
         setContent {
-            PptxRenderer(
-                slides = slides,
-                searchQuery = "" // Optional: dynamically highlight matching text
+            PptxWebView(
+                pptxSlides = slides,
+                isDarkMode = false,
+                textScale = 1f,
+                onWebViewCreated = { webView -> 
+                    // Handle WebView interactions
+                }
             )
         }
     }.onFailure { error ->
@@ -182,4 +163,4 @@ lifecycleScope.launch {
 ```
 
 ## Getting Started
-The `app` module contains a complete sample `DocumentViewerActivity`. Simply launch it, pick an office file, and the SDK will automatically read the POI stream and trigger the appropriate parser and renderer.
+The `app` module contains a complete sample `DocumentViewerActivity`. It demonstrates loading an Office file, dynamically changing the TopAppBar themes via `colors.xml`, and executing active text searches across the generated WebViews.
