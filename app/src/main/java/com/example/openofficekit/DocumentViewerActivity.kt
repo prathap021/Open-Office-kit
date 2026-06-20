@@ -24,9 +24,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.poirender.sdk.PoiRenderSDK
 import com.poirender.sdk.model.*
-import com.poirender.sdk.renderer.DocxRenderer
-import com.poirender.sdk.renderer.ExcelRenderer
-import com.poirender.sdk.renderer.PptxRenderer
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.core.net.toUri
@@ -286,27 +283,30 @@ else if (requiresPassword) {
                                 }
                             }
                         } else {
-                            // Document Viewport
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .pointerInput(Unit) {
-                                        detectTransformGestures { _, pan, zoom, _ ->
-                                            scale = (scale * zoom).coerceIn(0.1f, 5f)
-                                            offsetX += pan.x * scale
-                                            offsetY += pan.y * scale
-                                        }
-                                    }
-                                    .graphicsLayer(
-                                        scaleX = scale,
-                                        scaleY = scale,
-                                        translationX = offsetX,
-                                        translationY = offsetY
-                                    )
-                            ) {
-                                docxPages?.let { DocxRenderer(pages = it, searchQuery = searchQuery) }
-                                excelWorkbook?.let { ExcelRenderer(workbook = it, searchQuery = searchQuery) }
-                                pptxSlides?.let { PptxRenderer(slides = it, searchQuery = searchQuery) }
+                            // Document Viewport (WebView based zoom)
+                            docxPages?.let { 
+                                com.poirender.sdk.renderer.DocxWebView(
+                                    docxPages = it,
+                                    searchQuery = searchQuery,
+                                    isDarkMode = isDarkMode,
+                                    textScale = textScale
+                                ) 
+                            }
+                            excelWorkbook?.let { 
+                                com.poirender.sdk.renderer.ExcelWebView(
+                                    excelWorkbook = it,
+                                    searchQuery = searchQuery,
+                                    isDarkMode = isDarkMode,
+                                    textScale = textScale
+                                ) 
+                            }
+                            pptxSlides?.let { 
+                                com.poirender.sdk.renderer.PptxWebView(
+                                    pptxSlides = it,
+                                    searchQuery = searchQuery,
+                                    isDarkMode = isDarkMode,
+                                    textScale = textScale
+                                ) 
                             }
                         }
                     }
