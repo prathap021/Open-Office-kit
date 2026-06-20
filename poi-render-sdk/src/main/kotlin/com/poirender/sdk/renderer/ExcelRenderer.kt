@@ -56,13 +56,62 @@ fun ExcelRenderer(workbook: WorkbookData, searchQuery: String = "") {
                 }
                 val totalRows = sheet.rows.size
 
-                val cellWidth = 120.dp
-                val cellHeight = 48.dp
+                val defaultCellWidth = 120f
+                val maxCellWidth = 400f
+                val defaultCellHeight = 48f
+                val charWidthApprox = 8f
+
+                val colWidths = FloatArray(maxCols) { defaultCellWidth }
+                
+                sheet.rows.forEach { row ->
+                    row.cells.forEachIndexed { colIndex, cell ->
+                        if (cell.colSpan == 1) {
+                            val linesByNewline = cell.value.split('\n')
+                            var maxLineWidth = 0f
+                            linesByNewline.forEach { line ->
+                                val w = (line.length * charWidthApprox) + 32f
+                                if (w > maxLineWidth) maxLineWidth = w
+                            }
+                            if (maxLineWidth > colWidths[colIndex]) {
+                                colWidths[colIndex] = maxLineWidth.coerceAtMost(maxCellWidth)
+                            }
+                        }
+                    }
+                }
+
+                val colOffsets = FloatArray(maxCols + 1) { 0f }
+                for (i in 0 until maxCols) {
+                    colOffsets[i + 1] = colOffsets[i] + colWidths[i]
+                }
+
+                val rowHeights = FloatArray(totalRows) { defaultCellHeight }
+                sheet.rows.forEachIndexed { rowIndex, row ->
+                    row.cells.forEachIndexed { colIndex, cell ->
+                        if (cell.rowSpan == 1) {
+                            val linesByNewline = cell.value.split('\n')
+                            var estimatedLines = 0
+                            val actualColWidth = colWidths[colIndex]
+                            linesByNewline.forEach { line ->
+                                val w = (line.length * charWidthApprox) + 32f
+                                estimatedLines += Math.ceil((w / actualColWidth).toDouble()).toInt().coerceAtLeast(1)
+                            }
+                            val estimatedHeight = (estimatedLines * 20f) + 28f
+                            if (estimatedHeight > rowHeights[rowIndex]) {
+                                rowHeights[rowIndex] = estimatedHeight
+                            }
+                        }
+                    }
+                }
+
+                val rowOffsets = FloatArray(totalRows + 1) { 0f }
+                for (i in 0 until totalRows) {
+                    rowOffsets[i + 1] = rowOffsets[i] + rowHeights[i]
+                }
 
                 Box(
                     modifier = Modifier
-                        .width(cellWidth * maxCols)
-                        .height(cellHeight * totalRows)
+                        .width(colOffsets[maxCols].dp)
+                        .height(rowOffsets[totalRows].dp)
                         .background(colorResource(id = R.color.excel_grid_bg))
                 ) {
                     sheet.rows.forEachIndexed { rowIndex, row ->
@@ -74,6 +123,11 @@ fun ExcelRenderer(workbook: WorkbookData, searchQuery: String = "") {
 
                         row.cells.forEachIndexed { colIndex, cell ->
                             if (cell.colSpan > 0 && cell.rowSpan > 0) {
+                                val endCol = (colIndex + cell.colSpan).coerceAtMost(maxCols)
+                                val endRow = (rowIndex + cell.rowSpan).coerceAtMost(totalRows)
+                                val cellW = colOffsets[endCol] - colOffsets[colIndex]
+                                val cellH = rowOffsets[endRow] - rowOffsets[rowIndex]
+
                                 val annotatedString = buildAnnotatedString {
                                     withStyle(SpanStyle(color = colorResource(id = textColorRes))) {
                                         if (searchQuery.isNotBlank() && cell.value.contains(searchQuery, ignoreCase = true)) {
@@ -98,9 +152,9 @@ fun ExcelRenderer(workbook: WorkbookData, searchQuery: String = "") {
 
                                 Box(
                                     modifier = Modifier
-                                        .offset(x = cellWidth * colIndex, y = cellHeight * rowIndex)
-                                        .width(cellWidth * cell.colSpan)
-                                        .height(cellHeight * cell.rowSpan)
+                                        .offset(x = colOffsets[colIndex].dp, y = rowOffsets[rowIndex].dp)
+                                        .width(cellW.dp)
+                                        .height(cellH.dp)
                                         .background(colorResource(id = bgColorRes))
                                         .border(1.dp, colorResource(id = R.color.excel_cell_border))
                                         .padding(8.dp),

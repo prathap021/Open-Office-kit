@@ -108,6 +108,11 @@ class ExcelParser {
         
         var currentRowMap: MutableMap<Int, CellData>? = null
         var colIndex = 0
+        var rowIndex = 0
+        val coveredCells = mutableMapOf<Int, MutableSet<Int>>()
+        var currentMergeAcross = 0
+        var currentMergeDown = 0
+
         var inData = false
         var hasDataInCell = false
         val cellText = java.lang.StringBuilder()
@@ -126,13 +131,11 @@ class ExcelParser {
                         }
                         currentSheetName = name
                         currentRows = mutableListOf()
+                        rowIndex = 0
+                        coveredCells.clear()
                     }
                     "Row" -> {
                         currentRowMap = mutableMapOf()
-                        colIndex = 0
-                    }
-                    "Cell" -> {
-                        hasDataInCell = false
                         var indexStr: String? = null
                         for (i in 0 until parser.attributeCount) {
                             if (parser.getAttributeName(i).endsWith("Index")) {
@@ -141,7 +144,34 @@ class ExcelParser {
                             }
                         }
                         if (indexStr != null) {
+                            rowIndex = indexStr.toInt() - 1 // ss:Index is 1-based
+                        }
+                        colIndex = 0
+                    }
+                    "Cell" -> {
+                        hasDataInCell = false
+                        currentMergeAcross = 0
+                        currentMergeDown = 0
+                        var indexStr: String? = null
+                        for (i in 0 until parser.attributeCount) {
+                            val attrName = parser.getAttributeName(i)
+                            if (attrName.endsWith("Index")) {
+                                indexStr = parser.getAttributeValue(i)
+                            } else if (attrName.endsWith("MergeAcross")) {
+                                currentMergeAcross = parser.getAttributeValue(i).toIntOrNull() ?: 0
+                            } else if (attrName.endsWith("MergeDown")) {
+                                currentMergeDown = parser.getAttributeValue(i).toIntOrNull() ?: 0
+                            }
+                        }
+                        if (indexStr != null) {
                             colIndex = indexStr.toInt() - 1 // ss:Index is 1-based
+                        }
+                        // Advance past covered cells
+                        val currentCovered = coveredCells[rowIndex]
+                        if (currentCovered != null) {
+                            while (currentCovered.contains(colIndex)) {
+                                colIndex++
+                            }
                         }
                     }
                     "Data" -> { 
@@ -154,20 +184,61 @@ class ExcelParser {
                     "Data" -> { 
                         inData = false
                         hasDataInCell = true
-                        currentRowMap?.put(colIndex, CellData(cellText.toString()))
-                        colIndex++
+                        val colSpan = currentMergeAcross + 1
+                        val rowSpan = currentMergeDown + 1
+                        val isMerged = colSpan > 1 || rowSpan > 1
+                        currentRowMap?.put(colIndex, CellData(
+                            value = cellText.toString(), 
+                            isMerged = isMerged, 
+                            colSpan = colSpan, 
+                            rowSpan = rowSpan
+                        ))
+                        for (r in 0 until rowSpan) {
+                            for (c in 0 until colSpan) {
+                                if (r == 0 && c == 0) continue
+                                coveredCells.getOrPut(rowIndex + r) { mutableSetOf() }.add(colIndex + c)
+                                if (r == 0) {
+                                    currentRowMap?.put(colIndex + c, CellData("", isMerged = true, colSpan = 0, rowSpan = 0))
+                                }
+                            }
+                        }
+                        colIndex += colSpan
                     }
                     "Cell" -> {
                         if (!hasDataInCell) {
-                            colIndex++
+                            val colSpan = currentMergeAcross + 1
+                            val rowSpan = currentMergeDown + 1
+                            val isMerged = colSpan > 1 || rowSpan > 1
+                            currentRowMap?.put(colIndex, CellData(
+                                value = "", 
+                                isMerged = isMerged, 
+                                colSpan = colSpan, 
+                                rowSpan = rowSpan
+                            ))
+                            for (r in 0 until rowSpan) {
+                                for (c in 0 until colSpan) {
+                                    if (r == 0 && c == 0) continue
+                                    coveredCells.getOrPut(rowIndex + r) { mutableSetOf() }.add(colIndex + c)
+                                    if (r == 0) {
+                                        currentRowMap?.put(colIndex + c, CellData("", isMerged = true, colSpan = 0, rowSpan = 0))
+                                    }
+                                }
+                            }
+                            colIndex += colSpan
                         }
                     }
                     "Row" -> {
                         currentRowMap?.let { rowMap ->
+                            coveredCells[rowIndex]?.forEach { c ->
+                                if (!rowMap.containsKey(c)) {
+                                    rowMap[c] = CellData("", isMerged = true, colSpan = 0, rowSpan = 0)
+                                }
+                            }
                             val maxCol = (rowMap.keys.maxOrNull() ?: -1) + 1
                             val rowList = MutableList(maxCol) { i -> rowMap[i] ?: CellData("") }
                             currentRows?.add(RowData(rowList))
                         }
+                        rowIndex++
                     }
                     "Worksheet" -> {
                         currentRows?.let { rows ->

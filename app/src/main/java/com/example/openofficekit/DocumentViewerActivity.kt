@@ -109,15 +109,15 @@ class DocumentViewerActivity : ComponentActivity() {
                             Log.v(TAG, "Loading progress: ${(it * 100).toInt()}%")
                         }
                         when {
-                            initialDocName.endsWith(".docx", true) -> {
-                                Log.i(TAG, "Parsing as DOCX")
+                            initialDocName.endsWith(".docx", true) || initialDocName.endsWith(".doc", true) -> {
+                                Log.i(TAG, "Parsing as DOCX/DOC")
                                 sdk.parseDocx(uri, onProgress).onSuccess { 
                                     docxPages = it; isLoading = false 
-                                    Log.i(TAG, "DOCX parsed successfully: ${it.size} pages")
+                                    Log.i(TAG, "DOCX/DOC parsed successfully: ${it.size} pages")
                                 }
                                     .onFailure { 
                                         errorMessage = it.message; isLoading = false 
-                                        Log.e(TAG, "Failed to parse DOCX", it)
+                                        Log.e(TAG, "Failed to parse DOCX/DOC", it)
                                     }
                             }
                             initialDocName.endsWith(".pptx", true) || initialDocName.endsWith(".ppt", true) -> {
@@ -144,7 +144,7 @@ class DocumentViewerActivity : ComponentActivity() {
                             }
                             else -> {
                                 Log.w(TAG, "Unsupported file type: $initialDocName")
-                                errorMessage = "Unsupported file type: Please provide a valid DOCX, XLSX, or PPTX file."
+                                errorMessage = "Unsupported file type: Please provide a valid DOCX, DOC, XLSX, XLS, PPTX, or PPT file."
                                 isLoading = false
                             }
                         }
