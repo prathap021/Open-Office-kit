@@ -177,7 +177,30 @@ class DocxParser {
             text = "• $text"
         }
 
-        // Handle Text Color
+        val textRuns = mutableListOf<PageElement.TextRun>()
+        for (run in paragraph.runs) {
+            val runText = run.text()
+            if (runText.isNullOrEmpty()) continue
+            
+            var runColor: Int? = null
+            val colorHex = run.color
+            if (colorHex != null && colorHex != "auto") {
+                try {
+                    runColor = (if (colorHex.startsWith("#")) colorHex else "#$colorHex").toColorInt()
+                } catch (_: Throwable) {}
+            }
+            
+            textRuns.add(PageElement.TextRun(
+                text = runText,
+                isBold = run.isBold,
+                isItalic = run.isItalic,
+                isUnderline = run.underline != null && run.underline != UnderlinePatterns.NONE,
+                fontSize = run.fontSizeAsDouble?.toInt()?.takeIf { it > 0 } ?: 12,
+                color = runColor
+            ))
+        }
+
+        // Handle Text Color (fallback for older parser versions)
         var textColor: Int? = null
         val colorHex = firstRun?.color
         if (colorHex != null && colorHex != "auto") {
@@ -188,6 +211,7 @@ class DocxParser {
 
         return PageElement.TextElement(
             text = text,
+            runs = textRuns,
             isBold = firstRun?.isBold ?: false,
             isItalic = firstRun?.isItalic ?: false,
             isUnderline = firstRun?.underline != null && firstRun.underline != UnderlinePatterns.NONE,
@@ -205,7 +229,23 @@ class DocxParser {
     private fun parseTable(table: XWPFTable): PageElement.TableElement {
         val rows = table.rows.map { row ->
             row.tableCells.map { cell ->
-                PageElement.TableCell(listOf(PageElement.TextElement(cell.text)))
+                var bgColorInt: Int? = null
+                val bgColorStr = cell.color
+                if (bgColorStr != null && bgColorStr != "auto") {
+                    try {
+                        bgColorInt = (if (bgColorStr.startsWith("#")) bgColorStr else "#$bgColorStr").toColorInt()
+                    } catch (_: Throwable) {}
+                }
+
+                val elements = mutableListOf<PageElement>()
+                for (paragraph in cell.paragraphs) {
+                    elements.add(parseTextParagraph(paragraph))
+                }
+                if (elements.isEmpty() && cell.text.isNotBlank()) {
+                    elements.add(PageElement.TextElement(cell.text))
+                }
+
+                PageElement.TableCell(elements, backgroundColor = bgColorInt)
             }
         }
         return PageElement.TableElement(rows)

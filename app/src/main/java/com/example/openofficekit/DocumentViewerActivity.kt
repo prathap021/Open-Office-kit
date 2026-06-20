@@ -26,6 +26,7 @@ import com.poirender.sdk.PoiRenderSDK
 import com.poirender.sdk.model.*
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import android.webkit.WebView
 import androidx.core.net.toUri
 
 class DocumentViewerActivity : ComponentActivity() {
@@ -66,6 +67,7 @@ class DocumentViewerActivity : ComponentActivity() {
             var isDarkMode by remember { mutableStateOf(false) }
             var isHighContrast by remember { mutableStateOf(false) }
             var textScale by remember { mutableFloatStateOf(1f) }
+            var webViewRef by remember { mutableStateOf<WebView?>(null) }
 
             MaterialTheme(
                 colorScheme = if (isDarkMode) darkColorScheme() else lightColorScheme()
@@ -152,75 +154,84 @@ class DocumentViewerActivity : ComponentActivity() {
                     loadDocument()
                 }
 
-                var scale by remember { mutableFloatStateOf(1f) }
-                var offsetX by remember { mutableFloatStateOf(0f) }
-                var offsetY by remember { mutableFloatStateOf(0f) }
-                var showMenu by remember { mutableStateOf(false) }
+                val extension = initialDocName.substringAfterLast(".", "").lowercase()
+                val (toolbarBg, toolbarText) = when {
+                    extension in listOf("doc", "docx") -> Pair(
+                        androidx.compose.ui.res.colorResource(R.color.word_toolbar_bg),
+                        androidx.compose.ui.res.colorResource(R.color.word_toolbar_icon)
+                    )
+                    extension in listOf("xls", "xlsx") -> Pair(
+                        androidx.compose.ui.res.colorResource(R.color.excel_toolbar_bg),
+                        androidx.compose.ui.res.colorResource(R.color.excel_toolbar_icon)
+                    )
+                    extension in listOf("ppt", "pptx") -> Pair(
+                        androidx.compose.ui.res.colorResource(R.color.ppt_toolbar_bg),
+                        androidx.compose.ui.res.colorResource(R.color.ppt_toolbar_icon)
+                    )
+                    else -> Pair(MaterialTheme.colorScheme.primary, MaterialTheme.colorScheme.onPrimary)
+                }
 
                 Scaffold(
                     topBar = {
+                        @OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
                         TopAppBar(
+                            colors = TopAppBarDefaults.topAppBarColors(
+                                containerColor = toolbarBg,
+                                titleContentColor = toolbarText,
+                                actionIconContentColor = toolbarText
+                            ),
                             title = {
-                                Column {
+                                if (showSearchBar) {
+                                    TextField(
+                                        value = searchInput,
+                                        onValueChange = { 
+                                            searchInput = it
+                                            searchQuery = it
+                                            webViewRef?.findAllAsync(it)
+                                        },
+                                        modifier = Modifier.fillMaxWidth().padding(end = 8.dp),
+                                        placeholder = { Text("Find in document...") },
+                                        singleLine = true,
+                                        colors = TextFieldDefaults.colors(
+                                            focusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                            unfocusedContainerColor = androidx.compose.ui.graphics.Color.Transparent,
+                                            focusedTextColor = toolbarText,
+                                            unfocusedTextColor = toolbarText,
+                                            cursorColor = toolbarText,
+                                            focusedIndicatorColor = toolbarText,
+                                            unfocusedIndicatorColor = toolbarText.copy(alpha = 0.5f)
+                                        )
+                                    )
+                                } else {
                                     Text(initialDocName, fontSize = 16.sp, maxLines = 1, fontWeight = FontWeight.Bold)
-                                    val badge = initialDocName.substringAfterLast(".", "unknown").uppercase()
-                                    Surface(color = MaterialTheme.colorScheme.primaryContainer, shape = MaterialTheme.shapes.small) {
-                                        Text(badge, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp), color = MaterialTheme.colorScheme.onPrimaryContainer)
-                                    }
                                 }
                             },
                             actions = {
-                                IconButton(onClick = { showSearchBar = !showSearchBar }) {
-                                    Icon(Icons.Default.Search, contentDescription = "Search")
-                                }
-                                IconButton(onClick = { showMenu = true }) {
-                                    Icon(Icons.Default.MoreVert, contentDescription = "More")
-                                }
-                                DropdownMenu(expanded = showMenu, onDismissRequest = { showMenu = false }) {
-                                    DropdownMenuItem(text = { Text("Print") }, onClick = { showMenu = false; Toast.makeText(this@DocumentViewerActivity, "Print...", Toast.LENGTH_SHORT).show() })
-                                    DropdownMenuItem(text = { Text("Share Link") }, onClick = { showMenu = false; Toast.makeText(this@DocumentViewerActivity, "Sharing...", Toast.LENGTH_SHORT).show() })
-                                    DropdownMenuItem(text = { Text("Download File") }, onClick = { showMenu = false; Toast.makeText(this@DocumentViewerActivity, "Downloading...", Toast.LENGTH_SHORT).show() })
-                                    HorizontalDivider(
-                                        Modifier,
-                                        DividerDefaults.Thickness,
-                                        DividerDefaults.color
-                                    )
-                                    DropdownMenuItem(text = { Text(if (isDarkMode) "Light Mode" else "Dark Mode") }, onClick = { isDarkMode = !isDarkMode; showMenu = false })
-                                    DropdownMenuItem(text = { Text(if (isHighContrast) "Normal Contrast" else "High Contrast") }, onClick = { isHighContrast = !isHighContrast; showMenu = false })
-                                    DropdownMenuItem(text = { Text("Text Size Override (+20%)") }, onClick = { textScale += 0.2f; showMenu = false })
-                                    HorizontalDivider(
-                                        Modifier,
-                                        DividerDefaults.Thickness,
-                                        DividerDefaults.color
-                                    )
-                                    DropdownMenuItem(text = { Text("Zoom 50%") }, onClick = { scale = 0.5f; offsetX = 0f; offsetY = 0f; showMenu = false })
-                                    DropdownMenuItem(text = { Text("Zoom 75%") }, onClick = { scale = 0.75f; offsetX = 0f; offsetY = 0f; showMenu = false })
-                                    DropdownMenuItem(text = { Text("Zoom 100%") }, onClick = { scale = 1.0f; offsetX = 0f; offsetY = 0f; showMenu = false })
-                                    DropdownMenuItem(text = { Text("Fit to Screen / Width") }, onClick = { scale = 1.0f; offsetX = 0f; offsetY = 0f; showMenu = false })
+                                if (showSearchBar) {
+                                    IconButton(onClick = { webViewRef?.findNext(false) }) {
+                                        Icon(Icons.Default.KeyboardArrowUp, contentDescription = "Previous Match")
+                                    }
+                                    IconButton(onClick = { webViewRef?.findNext(true) }) {
+                                        Icon(Icons.Default.KeyboardArrowDown, contentDescription = "Next Match")
+                                    }
+                                    IconButton(onClick = { 
+                                        showSearchBar = false
+                                        searchQuery = ""
+                                        searchInput = ""
+                                        webViewRef?.clearMatches()
+                                    }) {
+                                        Icon(Icons.Default.Close, contentDescription = "Close")
+                                    }
+                                } else {
+                                    IconButton(onClick = { showSearchBar = true }) {
+                                        Icon(Icons.Default.Search, contentDescription = "Search")
+                                    }
                                 }
                             }
                         )
                     }
                 ) { paddingValues ->
                     Column(modifier = Modifier.padding(paddingValues).fillMaxSize()) {
-                        if (showSearchBar) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth().padding(8.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                OutlinedTextField(
-                                    value = searchInput,
-                                    onValueChange = { searchInput = it; searchQuery = it },
-                                    modifier = Modifier.weight(1f),
-                                    placeholder = { Text("Find in document...") },
-                                    singleLine = true
-                                )
-                                IconButton(onClick = { showSearchBar = false; searchQuery = ""; searchInput = "" }) {
-                                    Icon(Icons.Default.Close, contentDescription = "Close")
-                                }
-                            }
-                        }
 
                         if (isLoading) {
                             Box(modifier = Modifier.fillMaxSize()) {
@@ -287,25 +298,25 @@ else if (requiresPassword) {
                             docxPages?.let { 
                                 com.poirender.sdk.renderer.DocxWebView(
                                     docxPages = it,
-                                    searchQuery = searchQuery,
                                     isDarkMode = isDarkMode,
-                                    textScale = textScale
+                                    textScale = textScale,
+                                    onWebViewCreated = { webViewRef = it }
                                 ) 
                             }
                             excelWorkbook?.let { 
                                 com.poirender.sdk.renderer.ExcelWebView(
                                     excelWorkbook = it,
-                                    searchQuery = searchQuery,
                                     isDarkMode = isDarkMode,
-                                    textScale = textScale
+                                    textScale = textScale,
+                                    onWebViewCreated = { webViewRef = it }
                                 ) 
                             }
                             pptxSlides?.let { 
                                 com.poirender.sdk.renderer.PptxWebView(
                                     pptxSlides = it,
-                                    searchQuery = searchQuery,
                                     isDarkMode = isDarkMode,
-                                    textScale = textScale
+                                    textScale = textScale,
+                                    onWebViewCreated = { webViewRef = it }
                                 ) 
                             }
                         }
