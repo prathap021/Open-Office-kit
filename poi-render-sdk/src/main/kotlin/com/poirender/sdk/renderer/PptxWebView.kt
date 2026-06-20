@@ -40,9 +40,10 @@ fun PptxWebView(
                 when (shape) {
                     is SlideShape.TextShape -> {
                         val textColorHex = "#${Integer.toHexString(shape.color and 0x00ffffff).padStart(6, '0')}"
-                        var content = shape.text.replace("<", "&lt;").replace(">", "&gt;")
+                        var content = shape.text.replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br/>")
                         if (shape.isBold) content = "<b>$content</b>"
-                        sb.append("<p style=\"color: $textColorHex; font-size: ${shape.fontSize}px;\">$content</p>")
+                        val mobileFontSize = (shape.fontSize * 0.5f).toInt().coerceAtLeast(12)
+                        sb.append("<p style=\"color: $textColorHex; font-size: ${mobileFontSize}px; margin-top: 4px; margin-bottom: 4px;\">$content</p>")
                     }
                     is SlideShape.ImageShape -> {
                         val base64 = android.util.Base64.encodeToString(shape.imageData, android.util.Base64.NO_WRAP)
